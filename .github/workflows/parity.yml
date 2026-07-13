@@ -11,7 +11,7 @@ on:
 
 env:
   VS_VERSION: '1.22.3'
-  STRATUM_TAG: 'v1.22.3-stratum.14'
+  STRATUM_TAG: 'v1.22.3-stratum.15'
 
 jobs:
   parity:
