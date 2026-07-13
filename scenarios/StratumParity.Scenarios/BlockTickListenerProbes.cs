@@ -77,15 +77,17 @@ public class BlockTickListenerProbes : AtlasScenarioBase
 
     /// <summary>
     /// Shared setup: a Playing anchor player (Stratum builds its active-column set from
-    /// IsPlayingClient positions, see PlayerClientState), one counted listener next to
-    /// them, one 200 blocks out, the far column loaded and optionally kept loaded.
+    /// IsPlayingClient positions; Atlas joins reach Playing natively since 0.9.0), one
+    /// counted listener next to them, one 200 blocks out, the far column loaded and
+    /// optionally kept loaded.
     /// Counters are single-cell arrays so the tick lambdas can mutate them.
     /// </summary>
     internal static async Task<(int[] Near, int[] Far)> RegisterProbePair(
         IWorldSession world, string anchorName, bool keepFarLoaded, int farOffsetX, int farOffsetZ)
     {
-        ITestPlayer anchor = await world.JoinPlayer(anchorName);
-        PlayerClientState.MarkPlaying(world.Api, anchor.Player);
+        // Stratum builds its active-column set from IsPlayingClient positions; since
+        // Atlas 0.9.0, joined players reach Playing on their own.
+        await world.JoinPlayer(anchorName);
         await world.Ticks(5);
 
         BlockPos nearPos = world.Spawn.AddCopy(5, 1, 0);
