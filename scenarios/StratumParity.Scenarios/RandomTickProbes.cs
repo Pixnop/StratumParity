@@ -17,6 +17,7 @@ namespace StratumParity.Scenarios;
 /// count is far from the floors, and the Stratum far-platform assertion is exact zero
 /// (outside the radius the chunk is never sampled at all).
 /// </summary>
+[AtlasWorld(Mods = new[] { "mods/randomtickprobe" })]
 public class RandomTickProbes : AtlasScenarioBase
 {
     // Random ticks sample very few positions per chunk per pass (measured on vanilla:

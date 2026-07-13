@@ -12,6 +12,7 @@ namespace StratumParity.Scenarios;
 /// restores vanilla behavior. As with every Stratum config fixture, stratum.json must be
 /// seeded too or the performance file is never read.
 /// </summary>
+[AtlasWorld(Mods = new[] { "mods/randomtickprobe" })]
 [AtlasDataFiles("fixtures/stratum-randomticks-off", TargetPath = "")]
 public class RandomTickDisabledScenarios : AtlasScenarioBase
 {
