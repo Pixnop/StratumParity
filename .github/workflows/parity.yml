@@ -1,0 +1,98 @@
+name: Parity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Stratum releases every few days; a weekly run catches drift between pushes.
+    - cron: '0 6 * * 1'
+
+env:
+  VS_VERSION: '1.22.3'
+  STRATUM_TAG: 'v1.22.3-stratum.14'
+
+jobs:
+  parity:
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [vanilla, stratum]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache game install
+        id: cache-install
+        uses: actions/cache@v4
+        with:
+          path: ~/install/${{ matrix.flavor }}
+          key: install-${{ matrix.flavor }}-${{ env.VS_VERSION }}-${{ env.STRATUM_TAG }}
+
+      - name: Install vanilla server
+        if: matrix.flavor == 'vanilla' && steps.cache-install.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/install/vanilla
+          curl -fsSL "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_${VS_VERSION}.tar.gz" \
+            | tar -xz -C ~/install/vanilla
+          # The tarball may wrap the content in a server/ folder.
+          if [ -d ~/install/vanilla/server ]; then
+            mv ~/install/vanilla/server/* ~/install/vanilla/
+            rmdir ~/install/vanilla/server
+          fi
+
+      - name: Install and bootstrap Stratum server
+        if: matrix.flavor == 'stratum' && steps.cache-install.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/install/stratum && cd ~/install/stratum
+          ver="${STRATUM_TAG#v}"
+          curl -fsSLO "https://github.com/StratumServer/Stratum/releases/download/${STRATUM_TAG}/stratum-${ver}-linux-x64.zip"
+          python3 -m zipfile -e "stratum-${ver}-linux-x64.zip" .
+          rm "stratum-${ver}-linux-x64.zip"
+          chmod +x StratumServer
+          # First launch downloads the vanilla assets and applies the Stratum overlay,
+          # then starts serving; kill it once it reports ready.
+          ./StratumServer --dataPath /tmp/stratum-boot > boot.log 2>&1 &
+          boot_pid=$!
+          for i in $(seq 1 150); do
+            grep -q "Dedicated Server now running" boot.log && break
+            kill -0 "$boot_pid" 2>/dev/null || { cat boot.log; exit 1; }
+            sleep 4
+          done
+          grep -q "Dedicated Server now running" boot.log || { cat boot.log; exit 1; }
+          kill -INT "$boot_pid"; sleep 5; kill "$boot_pid" 2>/dev/null || true
+          rm -rf /tmp/stratum-boot
+
+      - name: Run scenarios
+        run: |
+          export VINTAGE_STORY="$HOME/install/${{ matrix.flavor }}"
+          dotnet test scenarios/StratumParity.Scenarios -c Release \
+            --logger "trx;LogFileName=${{ matrix.flavor }}.trx" \
+            --results-directory results
+
+      - name: Upload TRX
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trx-${{ matrix.flavor }}
+          path: results/*.trx
+
+  compare:
+    needs: parity
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+          merge-multiple: true
+
+      - name: Diff outcomes
+        run: python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx
