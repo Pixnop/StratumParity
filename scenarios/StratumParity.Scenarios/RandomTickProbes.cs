@@ -59,6 +59,10 @@ public class RandomTickProbes : AtlasScenarioBase
     {
         // The anchor player centers the 96-block random tick radius on spawn.
         await world.JoinPlayer(anchorName);
+        // The join triggers the server assets packet build, whose off-thread enumeration
+        // of every block and item races the mass SetBlock below on slow runners; let it
+        // settle first (see ServerAssets).
+        await ServerAssets.WaitUntilSettled(world);
         await world.Ticks(5);
 
         // Vanilla gates random ticks itself: only chunks within BlockTickChunkRange
