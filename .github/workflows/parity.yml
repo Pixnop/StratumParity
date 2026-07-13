@@ -82,6 +82,14 @@ jobs:
           name: trx-${{ matrix.flavor }}
           path: results/*.trx
 
+      - name: Upload server logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs-${{ matrix.flavor }}
+          path: /tmp/atlas/*/Logs/*.log
+          if-no-files-found: ignore
+
   compare:
     needs: parity
     runs-on: ubuntu-latest

@@ -30,6 +30,10 @@
 
   <ItemGroup>
     <None Include="fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Test-only source mod staged via [assembly: AtlasMods]; the game's ModLoader
+         compiles it at boot. Excluded from this project's own compilation. -->
+    <None Include="mods\**" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="mods\**" />
   </ItemGroup>
 
 </Project>
