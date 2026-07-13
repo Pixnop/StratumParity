@@ -63,12 +63,10 @@ public class EntityTickingProbes : AtlasScenarioBase
         const int farDistanceBlocks = 200;
 
         // The player is the reference point of every distance band. Without one, Stratum
-        // has no anchor and vanilla tracking deactivates entities too. The promotion to
-        // Playing matters: Stratum only counts IsPlayingClient clients, and Atlas fake
-        // players stop at Connected, which reads as an empty server and turns the entity
-        // throttle off (see PlayerClientState).
-        ITestPlayer anchor = await world.JoinPlayer("tick-anchor");
-        PlayerClientState.MarkPlaying(world.Api, anchor.Player);
+        // has no anchor and vanilla tracking deactivates entities too. Stratum only
+        // counts IsPlayingClient clients; since Atlas 0.9.0, JoinPlayer completes the
+        // real join sequence and the player reaches Playing on its own.
+        await world.JoinPlayer("tick-anchor");
         await world.Ticks(5);
 
         BlockPos nearPos = world.Spawn.AddCopy(5, 1, 0);
