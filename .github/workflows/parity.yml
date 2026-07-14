@@ -103,4 +103,7 @@ jobs:
           merge-multiple: true
 
       - name: Diff outcomes
-        run: python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx
+        run: |
+          python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx --markdown \
+            >> "$GITHUB_STEP_SUMMARY" || true
+          python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx
