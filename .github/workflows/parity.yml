@@ -71,9 +71,26 @@ jobs:
       - name: Run scenarios
         run: |
           export VINTAGE_STORY="$HOME/install/${{ matrix.flavor }}"
-          dotnet test scenarios/StratumParity.Scenarios -c Release \
-            --logger "trx;LogFileName=${{ matrix.flavor }}.trx" \
-            --results-directory results
+          run_suite() {
+            dotnet test scenarios/StratumParity.Scenarios -c Release \
+              --logger "trx;LogFileName=${{ matrix.flavor }}.trx" \
+              --results-directory results 2>&1 | tee test-output.log
+            return "${PIPESTATUS[0]}"
+          }
+          if ! run_suite; then
+            # A known engine race (StratumServer/Stratum#151) can kill the test host
+            # during a server BOOT, before any scenario runs: BuildServerAssetsPacket
+            # enumerates blocks/items on a pool thread while late boot work mutates
+            # them. Retry once, but only on that exact signature so real regressions
+            # keep failing loudly.
+            if grep -q "Collection was modified" test-output.log; then
+              echo "::warning::known engine race (Stratum#151) killed the test host; retrying once"
+              rm -rf results
+              run_suite
+            else
+              exit 1
+            fi
+          fi
 
       - name: Upload TRX
         if: always()
@@ -107,3 +124,51 @@ jobs:
           python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx --markdown \
             >> "$GITHUB_STEP_SUMMARY" || true
           python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx
+
+  publish:
+    # Append this run to the dashboard history and republish the site. main only,
+    # and never on the scheduled sweep (nothing changed to record).
+    needs: compare
+    if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site-out
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+          merge-multiple: true
+
+      - name: Append this run
+        run: |
+          mkdir -p site-out/data
+          python3 scripts/history_append.py results/vanilla.trx results/stratum.trx \
+            --history site-out/data/runs.json \
+            --run-id "${{ github.run_id }}" \
+            --sha "${{ github.sha }}" \
+            --date "$(git show -s --format=%cI ${{ github.sha }})" \
+            --stratum-tag "${STRATUM_TAG}" \
+            --event "${{ github.event_name }}"
+          cp site/index.html site-out/index.html
+          touch site-out/.nojekyll
+
+      - name: Publish to gh-pages
+        # The checkout action leaves authenticated credentials in the gh-pages clone,
+        # so the push needs no secret handling here.
+        run: |
+          cd site-out
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -q -m "dashboard: run ${{ github.run_id }}"
+          git push origin HEAD:gh-pages

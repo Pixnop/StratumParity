@@ -4,3 +4,5 @@
 .vs/
 results/
 *.trx
+site/data/
+**/__pycache__/

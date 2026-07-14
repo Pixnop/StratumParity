@@ -4,6 +4,10 @@ Differential behavior test suite for [Stratum](https://github.com/StratumServer/
 the performance-oriented server fork of Vintage Story. Built on
 [Atlas](https://github.com/Pixnop/Atlas), the in-process integration test harness.
 
+**Dashboard**: [leonfvt.fr/StratumParity](http://leonfvt.fr/StratumParity/) — run history,
+per-flavor and per-scenario duration trends, and the latest parity verdict, republished by
+CI on every main-branch run.
+
 Stratum promises performance gains without changing vanilla gameplay behavior. This suite
 puts that promise under test: the same scenarios run against a vanilla install and against
 a Stratum install, and the results must line up. Scenarios fall into two families:
