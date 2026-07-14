@@ -213,6 +213,12 @@ def print_markdown(vanilla_results, stratum_results):
     print(f"**Vanilla**: {vp}/{vt} passed in {vd:.0f}s. "
           f"**Stratum**: {sp}/{st} passed in {sd:.0f}s.")
     print()
+    print('> Δ duration compares scenario wall time and is only a performance signal for '
+          'scenarios whose flow is identical on both flavors. Probe scenarios are '
+          'asymmetric by design: proving an absence on Stratum takes a fixed observation '
+          'window, while proving a presence on vanilla ends at the first occurrence, so '
+          'their Δ is expected and not a regression.')
+    print()
     if divergences == 0:
         print('### ✅ Parity holds: no outcome divergence between flavors')
     else:
