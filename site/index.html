@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StratumParity dashboard</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --text-primary: #1a1a19;
+    --text-secondary: #5f5e58;
+    --grid: #e7e6e1;
+    --series-1: #2a78d6; /* vanilla */
+    --series-2: #1baf7a; /* stratum */
+    --status-good: #0ca30c;
+    --status-critical: #d03b3b;
+    --card: #ffffff;
+    --border: #e2e1dc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --grid: #33322f;
+      --series-1: #3987e5;
+      --series-2: #199e70;
+      --card: #232320;
+      --border: #3a3936;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--surface-1); color: var(--text-primary);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 28px 0 10px; }
+  .sub { color: var(--text-secondary); margin: 0 0 16px; }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 12px; font-weight: 600;
+    font-size: 13px; color: #fff;
+  }
+  .badge.good { background: var(--status-good); }
+  .badge.critical { background: var(--status-critical); }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; margin-bottom: 8px;
+  }
+  .legend { display: flex; gap: 16px; margin: 0 0 8px; color: var(--text-secondary); font-size: 13px; }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: baseline; }
+  svg { display: block; width: 100%; height: auto; }
+  .tooltip {
+    position: fixed; pointer-events: none; background: var(--card); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15); display: none; z-index: 10; white-space: nowrap;
+  }
+  select {
+    background: var(--card); color: var(--text-primary); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 8px; font-size: 13px; margin-bottom: 8px; max-width: 100%;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-secondary); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { color: var(--status-good); font-weight: 600; }
+  .ko { color: var(--status-critical); font-weight: 600; }
+  .verdicts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .verdicts a {
+    width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center;
+    justify-content: center; color: #fff; font-size: 13px; text-decoration: none; font-weight: 700;
+  }
+  .foot { color: var(--text-secondary); font-size: 12px; margin-top: 8px; }
+  code { background: var(--grid); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>StratumParity <span id="verdict-badge"></span></h1>
+  <p class="sub" id="pins">Differential parity suite: vanilla Vintage Story vs Stratum.</p>
+
+  <h2>Run verdicts</h2>
+  <div class="card"><div class="verdicts" id="verdicts"></div>
+    <p class="foot">One tile per recorded main-branch run: ✓ parity holds, ✗ outcome divergence. Click opens the run.</p>
+  </div>
+
+  <h2>Total suite duration per flavor</h2>
+  <div class="card">
+    <div class="legend">
+      <span><span class="sw" style="background:var(--series-1)"></span>vanilla</span>
+      <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
+    </div>
+    <svg id="chart-total" viewBox="0 0 920 260" role="img" aria-label="Total suite duration per flavor across runs"></svg>
+  </div>
+
+  <h2>Per-scenario duration</h2>
+  <div class="card">
+    <select id="scenario-select" aria-label="Scenario"></select>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--series-1)"></span>vanilla</span>
+      <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
+    </div>
+    <svg id="chart-scenario" viewBox="0 0 920 260" role="img" aria-label="Per-scenario duration across runs"></svg>
+  </div>
+
+  <h2>Latest run</h2>
+  <div class="card">
+    <table id="latest-table">
+      <thead><tr><th>Scenario</th><th>Vanilla</th><th class="num">s</th><th>Stratum</th><th class="num">s</th><th class="num">Δ s</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="foot">Δ duration is only a performance signal for scenarios whose flow is identical on
+    both flavors; probe scenarios proving an absence on Stratum use fixed observation windows and
+    expectedly run longer there.</p>
+  </div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+(async function () {
+  const resp = await fetch('data/runs.json');
+  const history = await resp.json();
+  const runs = history.runs;
+  if (!runs.length) return;
+  const latest = runs[runs.length - 1];
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  // Header badge and pins
+  const badge = document.getElementById('verdict-badge');
+  badge.className = 'badge ' + (latest.parity ? 'good' : 'critical');
+  badge.textContent = latest.parity ? '✓ parity holds' : '✗ divergence';
+  document.getElementById('pins').textContent =
+    `Differential parity suite: vanilla Vintage Story vs Stratum (${latest.stratum_tag}). ` +
+    `${runs.length} recorded run(s), latest ${latest.date.slice(0, 10)} @ ${latest.sha}.`;
+
+  // Verdict strip
+  const strip = document.getElementById('verdicts');
+  for (const run of runs) {
+    const a = document.createElement('a');
+    a.href = `https://github.com/Pixnop/StratumParity/actions/runs/${run.run_id}`;
+    a.style.background = run.parity ? css('--status-good') : css('--status-critical');
+    a.textContent = run.parity ? '✓' : '✗';
+    a.title = `${run.date.slice(0, 10)} @ ${run.sha}: ${run.parity ? 'parity holds' : 'divergence'}`;
+    strip.appendChild(a);
+  }
+
+  // Line chart helper: two series over run index, crosshair + tooltip, direct end labels.
+  const tooltip = document.getElementById('tooltip');
+  function drawChart(svg, seriesV, seriesS, unit) {
+    svg.innerHTML = '';
+    const W = 920, H = 260, m = { l: 44, r: 70, t: 12, b: 26 };
+    const n = runs.length;
+    const xs = i => n === 1 ? (m.l + (W - m.l - m.r) / 2) : m.l + i * (W - m.l - m.r) / (n - 1);
+    const values = seriesV.concat(seriesS).filter(v => v != null);
+    const yMax = Math.max(1, Math.max(...values)) * 1.15;
+    const ys = v => H - m.b - (v / yMax) * (H - m.t - m.b);
+    const NS = 'http://www.w3.org/2000/svg';
+    const el = (tag, attrs) => {
+      const e = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      svg.appendChild(e); return e;
+    };
+    // Recessive grid: 4 horizontal lines + y labels
+    for (let g = 0; g <= 4; g++) {
+      const v = yMax * g / 4, y = ys(v);
+      el('line', { x1: m.l, x2: W - m.r, y1: y, y2: y, stroke: css('--grid'), 'stroke-width': 1 });
+      const t = el('text', { x: m.l - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 11, fill: css('--text-secondary') });
+      t.textContent = v >= 10 ? Math.round(v) : v.toFixed(1);
+    }
+    // X labels: first, last, and up to 3 in between
+    const ticks = n <= 5 ? runs.map((_, i) => i) : [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor(3 * n / 4), n - 1];
+    for (const i of [...new Set(ticks)]) {
+      const t = el('text', { x: xs(i), y: H - 8, 'text-anchor': 'middle', 'font-size': 11, fill: css('--text-secondary') });
+      t.textContent = runs[i].date.slice(5, 10);
+    }
+    // Series: 2px line + endpoint direct label
+    const draw = (series, color, label, dy) => {
+      const pts = series.map((v, i) => v == null ? null : [xs(i), ys(v)]);
+      const d = pts.map((p, i) => p === null ? '' : (i === 0 || pts[i - 1] === null ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join('');
+      el('path', { d, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round' });
+      const last = [...pts].reverse().find(p => p !== null);
+      if (last) {
+        el('circle', { cx: last[0], cy: last[1], r: 3.5, fill: color });
+        const t = el('text', { x: last[0] + 8, y: last[1] + dy, 'font-size': 11, fill: css('--text-secondary') });
+        t.textContent = label;
+      }
+    };
+    draw(seriesV, css('--series-1'), 'vanilla', -2);
+    draw(seriesS, css('--series-2'), 'stratum', 12);
+    // Hover: crosshair + shared tooltip on nearest run
+    const cross = el('line', { y1: m.t, y2: H - m.b, stroke: css('--text-secondary'), 'stroke-width': 1, 'stroke-dasharray': '3,3', visibility: 'hidden' });
+    const overlay = el('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent' });
+    overlay.addEventListener('mousemove', ev => {
+      const rect = svg.getBoundingClientRect();
+      const px = (ev.clientX - rect.left) * (W / rect.width);
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < n; i++) { const d = Math.abs(xs(i) - px); if (d < bd) { bd = d; best = i; } }
+      cross.setAttribute('x1', xs(best)); cross.setAttribute('x2', xs(best));
+      cross.setAttribute('visibility', 'visible');
+      const fmt = v => v == null ? 'n/a' : v.toFixed(1) + unit;
+      tooltip.innerHTML = `<b>${runs[best].date.slice(0, 10)}</b> @ ${runs[best].sha}<br>` +
+        `vanilla: ${fmt(seriesV[best])}<br>stratum: ${fmt(seriesS[best])}`;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (ev.clientX + 14) + 'px';
+      tooltip.style.top = (ev.clientY + 14) + 'px';
+    });
+    overlay.addEventListener('mouseleave', () => {
+      cross.setAttribute('visibility', 'hidden'); tooltip.style.display = 'none';
+    });
+  }
+
+  // Chart 1: totals
+  drawChart(document.getElementById('chart-total'),
+    runs.map(r => r.totals.vanilla.duration), runs.map(r => r.totals.stratum.duration), 's');
+
+  // Chart 2: per-scenario with select
+  const names = [...new Set(runs.flatMap(r => Object.keys(r.scenarios)))].sort();
+  const select = document.getElementById('scenario-select');
+  for (const name of names) {
+    const o = document.createElement('option'); o.value = name; o.textContent = name; select.appendChild(o);
+  }
+  const drawScenario = () => {
+    const name = select.value;
+    drawChart(document.getElementById('chart-scenario'),
+      runs.map(r => r.scenarios[name] && r.scenarios[name].v ? r.scenarios[name].v[1] : null),
+      runs.map(r => r.scenarios[name] && r.scenarios[name].s ? r.scenarios[name].s[1] : null), 's');
+  };
+  select.addEventListener('change', drawScenario);
+  drawScenario();
+
+  // Latest run table
+  const tbody = document.querySelector('#latest-table tbody');
+  for (const [name, e] of Object.entries(latest.scenarios)) {
+    const v = e.v, s = e.s;
+    const cell = o => o ? (o[0] === 'Passed' ? '<span class="ok">✓ passed</span>' : '<span class="ko">✗ ' + o[0].toLowerCase() + '</span>') : '➖';
+    const delta = v && s ? (s[1] - v[1]).toFixed(1) : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><code>${name}</code></td><td>${cell(v)}</td><td class="num">${v ? v[1].toFixed(1) : ''}</td>` +
+      `<td>${cell(s)}</td><td class="num">${s ? s[1].toFixed(1) : ''}</td><td class="num">${delta}</td>`;
+    tbody.appendChild(tr);
+  }
+})();
+</script>
+</body>
+</html>

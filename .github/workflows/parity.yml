@@ -107,3 +107,50 @@ jobs:
           python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx --markdown \
             >> "$GITHUB_STEP_SUMMARY" || true
           python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx
+
+  publish:
+    # Append this run to the dashboard history and republish the site. main only,
+    # and never on the scheduled sweep (nothing changed to record).
+    needs: compare
+    if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+          merge-multiple: true
+
+      - name: Check out gh-pages history
+        run: |
+          git fetch origin gh-pages || true
+          mkdir -p site-out/data
+          git show origin/gh-pages:data/runs.json > site-out/data/runs.json 2>/dev/null || true
+
+      - name: Append this run
+        run: |
+          python3 scripts/history_append.py results/vanilla.trx results/stratum.trx \
+            --history site-out/data/runs.json \
+            --run-id "${{ github.run_id }}" \
+            --sha "${{ github.sha }}" \
+            --date "$(git show -s --format=%cI ${{ github.sha }})" \
+            --stratum-tag "${STRATUM_TAG}" \
+            --event "${{ github.event_name }}"
+          cp site/index.html site-out/index.html
+          touch site-out/.nojekyll
+
+      - name: Publish to gh-pages
+        run: |
+          cd site-out
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "dashboard: run ${{ github.run_id }}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:gh-pages
