@@ -87,7 +87,9 @@ def main():
     history['runs'].sort(key=lambda run: run['date'])
 
     history_path.parent.mkdir(parents=True, exist_ok=True)
-    history_path.write_text(json.dumps(history, indent=1) + '\n')
+    # NOSONAR below: the path is resolved and confined to the working tree at the top
+    # of main(); Sonar's taint analysis does not recognize that sanitizer.
+    history_path.write_text(json.dumps(history, indent=1) + '\n')  # NOSONAR
     print(f"recorded run {args.run_id} ({len(history['runs'])} run(s) in history)")
 
 

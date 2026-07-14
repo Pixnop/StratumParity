@@ -71,9 +71,26 @@ jobs:
       - name: Run scenarios
         run: |
           export VINTAGE_STORY="$HOME/install/${{ matrix.flavor }}"
-          dotnet test scenarios/StratumParity.Scenarios -c Release \
-            --logger "trx;LogFileName=${{ matrix.flavor }}.trx" \
-            --results-directory results
+          run_suite() {
+            dotnet test scenarios/StratumParity.Scenarios -c Release \
+              --logger "trx;LogFileName=${{ matrix.flavor }}.trx" \
+              --results-directory results 2>&1 | tee test-output.log
+            return "${PIPESTATUS[0]}"
+          }
+          if ! run_suite; then
+            # A known engine race (StratumServer/Stratum#151) can kill the test host
+            # during a server BOOT, before any scenario runs: BuildServerAssetsPacket
+            # enumerates blocks/items on a pool thread while late boot work mutates
+            # them. Retry once, but only on that exact signature so real regressions
+            # keep failing loudly.
+            if grep -q "Collection was modified" test-output.log; then
+              echo "::warning::known engine race (Stratum#151) killed the test host; retrying once"
+              rm -rf results
+              run_suite
+            else
+              exit 1
+            fi
+          fi
 
       - name: Upload TRX
         if: always()
