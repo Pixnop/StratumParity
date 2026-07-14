@@ -122,19 +122,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site-out
+
       - uses: actions/download-artifact@v4
         with:
           path: results
           merge-multiple: true
 
-      - name: Check out gh-pages history
-        run: |
-          git fetch origin gh-pages || true
-          mkdir -p site-out/data
-          git show origin/gh-pages:data/runs.json > site-out/data/runs.json 2>/dev/null || true
-
       - name: Append this run
         run: |
+          mkdir -p site-out/data
           python3 scripts/history_append.py results/vanilla.trx results/stratum.trx \
             --history site-out/data/runs.json \
             --run-id "${{ github.run_id }}" \
@@ -146,11 +146,12 @@ jobs:
           touch site-out/.nojekyll
 
       - name: Publish to gh-pages
+        # The checkout action leaves authenticated credentials in the gh-pages clone,
+        # so the push needs no secret handling here.
         run: |
           cd site-out
-          git init -q
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -q -m "dashboard: run ${{ github.run_id }}"
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:gh-pages
+          git diff --cached --quiet || git commit -q -m "dashboard: run ${{ github.run_id }}"
+          git push origin HEAD:gh-pages

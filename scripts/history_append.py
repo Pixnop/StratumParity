@@ -39,7 +39,14 @@ def main():
     parser.add_argument('--event', default='')
     args = parser.parse_args()
 
-    history_path = Path(args.history)
+    # The history file is always somewhere under the caller's working tree (the
+    # gh-pages checkout in CI); refuse anything that resolves outside it so a bad
+    # argument cannot write elsewhere on the filesystem.
+    history_path = Path(args.history).resolve()
+    workdir = Path.cwd().resolve()
+    if not history_path.is_relative_to(workdir):
+        sys.exit(f'refusing to touch a history file outside {workdir}: {history_path}')
+
     if history_path.exists():
         history = json.loads(history_path.read_text())
     else:
