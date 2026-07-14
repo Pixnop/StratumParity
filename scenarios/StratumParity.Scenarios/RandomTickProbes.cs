@@ -57,12 +57,11 @@ public class RandomTickProbes : AtlasScenarioBase
     internal static async Task<(List<BlockPos> Near, List<BlockPos> Far)> PlacePlatforms(
         Atlas.Api.IWorldSession world, string anchorName)
     {
-        // The anchor player centers the 96-block random tick radius on spawn.
+        // The anchor player centers the 96-block random tick radius on spawn. Since
+        // Atlas 0.9.1, JoinPlayer itself waits for the server assets packet build to
+        // complete (issue #84, born from this suite's CI crash), so the mass SetBlock
+        // below no longer races the build's off-thread item enumeration.
         await world.JoinPlayer(anchorName);
-        // The join triggers the server assets packet build, whose off-thread enumeration
-        // of every block and item races the mass SetBlock below on slow runners; let it
-        // settle first (see ServerAssets).
-        await ServerAssets.WaitUntilSettled(world);
         await world.Ticks(5);
 
         // Vanilla gates random ticks itself: only chunks within BlockTickChunkRange
