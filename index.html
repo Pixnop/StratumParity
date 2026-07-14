@@ -3,117 +3,206 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Differential parity dashboard: vanilla Vintage Story vs Stratum, run history and duration trends.">
 <title>StratumParity dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
 <style>
   :root {
-    --surface-1: #fcfcfb;
+    --surface-1: #f6f6f4;
     --text-primary: #1a1a19;
-    --text-secondary: #5f5e58;
+    --text-secondary: #6b6a63;
+    --text-muted: #96958c;
     --grid: #e7e6e1;
     --series-1: #2a78d6; /* vanilla */
     --series-2: #1baf7a; /* stratum */
     --status-good: #0ca30c;
     --status-critical: #d03b3b;
     --card: #ffffff;
-    --border: #e2e1dc;
+    --border: #e4e3de;
+    --accent-soft: #eef4fc;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --surface-1: #1a1a19;
-      --text-primary: #ffffff;
-      --text-secondary: #c3c2b7;
-      --grid: #33322f;
+      --surface-1: #161615;
+      --text-primary: #f4f3ee;
+      --text-secondary: #b9b8ae;
+      --text-muted: #85847b;
+      --grid: #2f2e2b;
       --series-1: #3987e5;
       --series-2: #199e70;
-      --card: #232320;
-      --border: #3a3936;
+      --card: #1f1f1d;
+      --border: #34332f;
+      --accent-soft: #22293357;
     }
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
-    margin: 0; padding: 24px; background: var(--surface-1); color: var(--text-primary);
-    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0; background: var(--surface-1); color: var(--text-primary);
+    font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 980px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  h2 { font-size: 15px; margin: 28px 0 10px; }
-  .sub { color: var(--text-secondary); margin: 0 0 16px; }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 36px 24px 56px; }
+
+  /* Header */
+  header { margin-bottom: 26px; }
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: .12em; font-size: 11px; font-weight: 700;
+    color: var(--text-muted); margin: 0 0 6px;
+  }
+  h1 { font-size: 27px; margin: 0 0 6px; letter-spacing: -.02em; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sub { color: var(--text-secondary); margin: 0; max-width: 70ch; }
+  .sub a { color: inherit; }
   .badge {
-    display: inline-block; padding: 2px 10px; border-radius: 12px; font-weight: 600;
-    font-size: 13px; color: #fff;
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 999px;
+    font-weight: 700; font-size: 13px; color: #fff; letter-spacing: 0; vertical-align: middle;
   }
   .badge.good { background: var(--status-good); }
   .badge.critical { background: var(--status-critical); }
+
+  /* Stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 22px 0 6px; }
+  .tile {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px 12px;
+  }
+  .tile .k {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 4px;
+  }
+  .tile .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .tile .v small { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-left: 2px; }
+  .tile .d { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* Sections and cards */
+  section { margin-top: 34px; }
+  h2 { font-size: 16px; margin: 0 0 3px; letter-spacing: -.01em; }
+  .caption { color: var(--text-secondary); font-size: 13px; margin: 0 0 12px; }
   .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-    padding: 16px; margin-bottom: 8px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 18px 14px;
   }
-  .legend { display: flex; gap: 16px; margin: 0 0 8px; color: var(--text-secondary); font-size: 13px; }
-  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: baseline; }
-  svg { display: block; width: 100%; height: auto; }
-  .tooltip {
-    position: fixed; pointer-events: none; background: var(--card); color: var(--text-primary);
-    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15); display: none; z-index: 10; white-space: nowrap;
-  }
+
+  /* Legend + controls */
+  .controls { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; }
+  .legend { display: flex; gap: 16px; color: var(--text-secondary); font-size: 13px; }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
   select {
     background: var(--card); color: var(--text-primary); border: 1px solid var(--border);
-    border-radius: 6px; padding: 4px 8px; font-size: 13px; margin-bottom: 8px; max-width: 100%;
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; max-width: 100%;
   }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; }
-  th, td { text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--border); }
-  th { color: var(--text-secondary); font-weight: 600; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .ok { color: var(--status-good); font-weight: 600; }
-  .ko { color: var(--status-critical); font-weight: 600; }
+  select:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+  svg.chart { display: block; width: 100%; height: auto; }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed; pointer-events: none; background: var(--card); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18); display: none; z-index: 10; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .tooltip b { font-size: 12px; }
+  .tooltip .row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .tooltip .sw { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+  /* Verdict strip */
   .verdicts { display: flex; gap: 6px; flex-wrap: wrap; }
   .verdicts a {
-    width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center;
+    width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center;
     justify-content: center; color: #fff; font-size: 13px; text-decoration: none; font-weight: 700;
+    transition: transform .08s ease;
   }
-  .foot { color: var(--text-secondary); font-size: 12px; margin-top: 8px; }
-  code { background: var(--grid); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .verdicts a:hover { transform: scale(1.18); }
+
+  /* Table */
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--accent-soft); }
+  th { color: var(--text-muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .scen .cls { color: var(--text-muted); font-size: 12px; display: block; }
+  .scen .mth { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 12px; }
+  .ok { color: var(--status-good); font-weight: 700; white-space: nowrap; }
+  .ko { color: var(--status-critical); font-weight: 700; white-space: nowrap; }
+
+  .foot { color: var(--text-muted); font-size: 12px; margin: 10px 2px 0; }
+  footer {
+    margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--border);
+    color: var(--text-muted); font-size: 12px; display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  footer a { color: var(--text-secondary); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>StratumParity <span id="verdict-badge"></span></h1>
-  <p class="sub" id="pins">Differential parity suite: vanilla Vintage Story vs Stratum.</p>
+  <header>
+    <p class="eyebrow">Vintage Story · differential testing</p>
+    <h1>StratumParity <span id="verdict-badge"></span></h1>
+    <p class="sub">The same gameplay scenarios run against a vanilla server and a
+      <a href="https://github.com/StratumServer/Stratum">Stratum</a> server; outcomes must line up.
+      History below is appended by CI on every main-branch run.</p>
+    <div class="tiles" id="tiles"></div>
+  </header>
 
-  <h2>Run verdicts</h2>
-  <div class="card"><div class="verdicts" id="verdicts"></div>
-    <p class="foot">One tile per recorded main-branch run: ✓ parity holds, ✗ outcome divergence. Click opens the run.</p>
-  </div>
+  <section>
+    <h2>Run verdicts</h2>
+    <p class="caption">One tile per recorded run: ✓ parity holds, ✗ outcome divergence. Click opens the CI run.</p>
+    <div class="card"><div class="verdicts" id="verdicts"></div></div>
+  </section>
 
-  <h2>Total suite duration per flavor</h2>
-  <div class="card">
-    <div class="legend">
-      <span><span class="sw" style="background:var(--series-1)"></span>vanilla</span>
-      <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
+  <section>
+    <h2>Total suite duration</h2>
+    <p class="caption">Wall time of the 16-scenario suite per flavor, across runs. Seconds.</p>
+    <div class="card">
+      <div class="controls">
+        <div class="legend">
+          <span><span class="sw" style="background:var(--series-1)"></span>vanilla</span>
+          <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
+        </div>
+      </div>
+      <svg id="chart-total" class="chart" viewBox="0 0 960 270" role="img" aria-label="Total suite duration per flavor across runs"></svg>
     </div>
-    <svg id="chart-total" viewBox="0 0 920 260" role="img" aria-label="Total suite duration per flavor across runs"></svg>
-  </div>
+  </section>
 
-  <h2>Per-scenario duration</h2>
-  <div class="card">
-    <select id="scenario-select" aria-label="Scenario"></select>
-    <div class="legend">
-      <span><span class="sw" style="background:var(--series-1)"></span>vanilla</span>
-      <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
+  <section>
+    <h2>Per-scenario duration</h2>
+    <p class="caption">Pick a scenario to follow its duration on both flavors across runs. Seconds.</p>
+    <div class="card">
+      <div class="controls">
+        <select id="scenario-select" aria-label="Scenario"></select>
+        <div class="legend">
+          <span><span class="sw" style="background:var(--series-1)"></span>vanilla</span>
+          <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
+        </div>
+      </div>
+      <svg id="chart-scenario" class="chart" viewBox="0 0 960 270" role="img" aria-label="Per-scenario duration across runs"></svg>
     </div>
-    <svg id="chart-scenario" viewBox="0 0 920 260" role="img" aria-label="Per-scenario duration across runs"></svg>
-  </div>
+  </section>
 
-  <h2>Latest run</h2>
-  <div class="card">
-    <table id="latest-table">
-      <thead><tr><th>Scenario</th><th>Vanilla</th><th class="num">s</th><th>Stratum</th><th class="num">s</th><th class="num">Δ s</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <p class="foot">Δ duration is only a performance signal for scenarios whose flow is identical on
-    both flavors; probe scenarios proving an absence on Stratum use fixed observation windows and
-    expectedly run longer there.</p>
-  </div>
+  <section>
+    <h2>Latest run</h2>
+    <p class="caption" id="latest-caption"></p>
+    <div class="card">
+      <div class="tablewrap">
+      <table id="latest-table">
+        <thead><tr><th>Scenario</th><th>Vanilla</th><th class="num">s</th><th>Stratum</th><th class="num">s</th><th class="num">Δ s</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+      <p class="foot">Δ duration is a performance signal only for scenarios whose flow is identical on
+      both flavors. Probe scenarios proving an absence on Stratum use fixed observation windows and
+      expectedly run longer there.</p>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://github.com/Pixnop/StratumParity">Repository</a>
+    <a href="https://github.com/Pixnop/StratumParity/actions">CI runs</a>
+    <a href="https://github.com/StratumServer/Stratum/issues/147">Stratum #147</a>
+    <a href="https://github.com/Pixnop/Atlas">Built on Atlas</a>
+  </footer>
 </div>
 <div class="tooltip" id="tooltip"></div>
 
@@ -126,13 +215,27 @@
   const latest = runs[runs.length - 1];
   const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-  // Header badge and pins
+  // Header badge
   const badge = document.getElementById('verdict-badge');
   badge.className = 'badge ' + (latest.parity ? 'good' : 'critical');
   badge.textContent = latest.parity ? '✓ parity holds' : '✗ divergence';
-  document.getElementById('pins').textContent =
-    `Differential parity suite: vanilla Vintage Story vs Stratum (${latest.stratum_tag}). ` +
-    `${runs.length} recorded run(s), latest ${latest.date.slice(0, 10)} @ ${latest.sha}.`;
+
+  // Stat tiles
+  const greens = runs.filter(r => r.parity).length;
+  const tiles = [
+    { k: 'Recorded runs', v: String(runs.length), d: `${greens} green · ${runs.length - greens} red` },
+    { k: 'Scenarios', v: String(Object.keys(latest.scenarios).length), d: 'six covered surfaces' },
+    { k: 'Vanilla suite', v: latest.totals.vanilla.duration.toFixed(0), vu: 's', d: `${latest.totals.vanilla.passed}/${latest.totals.vanilla.total} passed` },
+    { k: 'Stratum suite', v: latest.totals.stratum.duration.toFixed(0), vu: 's', d: `${latest.totals.stratum.passed}/${latest.totals.stratum.total} passed` },
+    { k: 'Pinned Stratum', v: (latest.stratum_tag || '?').replace('v1.22.3-', ''), d: latest.date.slice(0, 10) + ' @ ' + latest.sha.slice(0, 7) },
+  ];
+  const tilesEl = document.getElementById('tiles');
+  for (const t of tiles) {
+    const div = document.createElement('div');
+    div.className = 'tile';
+    div.innerHTML = `<div class="k">${t.k}</div><div class="v">${t.v}${t.vu ? `<small>${t.vu}</small>` : ''}</div><div class="d">${t.d}</div>`;
+    tilesEl.appendChild(div);
+  }
 
   // Verdict strip
   const strip = document.getElementById('verdicts');
@@ -145,15 +248,15 @@
     strip.appendChild(a);
   }
 
-  // Line chart helper: two series over run index, crosshair + tooltip, direct end labels.
+  // Line chart: two series over run index, crosshair + tooltip, direct end labels.
   const tooltip = document.getElementById('tooltip');
   function drawChart(svg, seriesV, seriesS, unit) {
     svg.innerHTML = '';
-    const W = 920, H = 260, m = { l: 44, r: 70, t: 12, b: 26 };
+    const W = 960, H = 270, m = { l: 46, r: 76, t: 14, b: 30 };
     const n = runs.length;
     const xs = i => n === 1 ? (m.l + (W - m.l - m.r) / 2) : m.l + i * (W - m.l - m.r) / (n - 1);
     const values = seriesV.concat(seriesS).filter(v => v != null);
-    const yMax = Math.max(1, Math.max(...values)) * 1.15;
+    const yMax = Math.max(1, Math.max(...values)) * 1.12;
     const ys = v => H - m.b - (v / yMax) * (H - m.t - m.b);
     const NS = 'http://www.w3.org/2000/svg';
     const el = (tag, attrs) => {
@@ -161,35 +264,33 @@
       for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
       svg.appendChild(e); return e;
     };
-    // Recessive grid: 4 horizontal lines + y labels
     for (let g = 0; g <= 4; g++) {
       const v = yMax * g / 4, y = ys(v);
       el('line', { x1: m.l, x2: W - m.r, y1: y, y2: y, stroke: css('--grid'), 'stroke-width': 1 });
-      const t = el('text', { x: m.l - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 11, fill: css('--text-secondary') });
+      const t = el('text', { x: m.l - 8, y: y + 4, 'text-anchor': 'end', 'font-size': 11, fill: css('--text-muted') });
       t.textContent = v >= 10 ? Math.round(v) : v.toFixed(1);
     }
-    // X labels: first, last, and up to 3 in between
-    const ticks = n <= 5 ? runs.map((_, i) => i) : [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor(3 * n / 4), n - 1];
+    const ticks = n <= 6 ? runs.map((_, i) => i) : [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor(3 * n / 4), n - 1];
     for (const i of [...new Set(ticks)]) {
-      const t = el('text', { x: xs(i), y: H - 8, 'text-anchor': 'middle', 'font-size': 11, fill: css('--text-secondary') });
+      const t = el('text', { x: xs(i), y: H - 10, 'text-anchor': 'middle', 'font-size': 11, fill: css('--text-muted') });
       t.textContent = runs[i].date.slice(5, 10);
     }
-    // Series: 2px line + endpoint direct label
     const draw = (series, color, label, dy) => {
       const pts = series.map((v, i) => v == null ? null : [xs(i), ys(v)]);
       const d = pts.map((p, i) => p === null ? '' : (i === 0 || pts[i - 1] === null ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join('');
-      el('path', { d, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round' });
+      el('path', { d, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
       const last = [...pts].reverse().find(p => p !== null);
       if (last) {
-        el('circle', { cx: last[0], cy: last[1], r: 3.5, fill: color });
-        const t = el('text', { x: last[0] + 8, y: last[1] + dy, 'font-size': 11, fill: css('--text-secondary') });
+        el('circle', { cx: last[0], cy: last[1], r: 3.5, fill: color, stroke: css('--card'), 'stroke-width': 2 });
+        const t = el('text', { x: last[0] + 9, y: last[1] + dy, 'font-size': 11, 'font-weight': 600, fill: css('--text-secondary') });
         t.textContent = label;
       }
     };
-    draw(seriesV, css('--series-1'), 'vanilla', -2);
-    draw(seriesS, css('--series-2'), 'stratum', 12);
-    // Hover: crosshair + shared tooltip on nearest run
-    const cross = el('line', { y1: m.t, y2: H - m.b, stroke: css('--text-secondary'), 'stroke-width': 1, 'stroke-dasharray': '3,3', visibility: 'hidden' });
+    draw(seriesV, css('--series-1'), 'vanilla', -3);
+    draw(seriesS, css('--series-2'), 'stratum', 13);
+    const cross = el('line', { y1: m.t, y2: H - m.b, stroke: css('--text-muted'), 'stroke-width': 1, 'stroke-dasharray': '3,3', visibility: 'hidden' });
+    const dotV = el('circle', { r: 4, fill: css('--series-1'), stroke: css('--card'), 'stroke-width': 2, visibility: 'hidden' });
+    const dotS = el('circle', { r: 4, fill: css('--series-2'), stroke: css('--card'), 'stroke-width': 2, visibility: 'hidden' });
     const overlay = el('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent' });
     overlay.addEventListener('mousemove', ev => {
       const rect = svg.getBoundingClientRect();
@@ -198,27 +299,37 @@
       for (let i = 0; i < n; i++) { const d = Math.abs(xs(i) - px); if (d < bd) { bd = d; best = i; } }
       cross.setAttribute('x1', xs(best)); cross.setAttribute('x2', xs(best));
       cross.setAttribute('visibility', 'visible');
+      const place = (dot, v) => {
+        if (v == null) { dot.setAttribute('visibility', 'hidden'); return; }
+        dot.setAttribute('cx', xs(best)); dot.setAttribute('cy', ys(v));
+        dot.setAttribute('visibility', 'visible');
+      };
+      place(dotV, seriesV[best]); place(dotS, seriesS[best]);
       const fmt = v => v == null ? 'n/a' : v.toFixed(1) + unit;
-      tooltip.innerHTML = `<b>${runs[best].date.slice(0, 10)}</b> @ ${runs[best].sha}<br>` +
-        `vanilla: ${fmt(seriesV[best])}<br>stratum: ${fmt(seriesS[best])}`;
+      tooltip.innerHTML = `<b>${runs[best].date.slice(0, 10)}</b> · ${runs[best].sha.slice(0, 7)} · ${(runs[best].stratum_tag || '').replace('v1.22.3-', '')}` +
+        `<div class="row"><span class="sw" style="background:${css('--series-1')}"></span>vanilla ${fmt(seriesV[best])}</div>` +
+        `<div class="row"><span class="sw" style="background:${css('--series-2')}"></span>stratum ${fmt(seriesS[best])}</div>`;
       tooltip.style.display = 'block';
-      tooltip.style.left = (ev.clientX + 14) + 'px';
+      tooltip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 190) + 'px';
       tooltip.style.top = (ev.clientY + 14) + 'px';
     });
     overlay.addEventListener('mouseleave', () => {
-      cross.setAttribute('visibility', 'hidden'); tooltip.style.display = 'none';
+      cross.setAttribute('visibility', 'hidden');
+      dotV.setAttribute('visibility', 'hidden');
+      dotS.setAttribute('visibility', 'hidden');
+      tooltip.style.display = 'none';
     });
   }
 
-  // Chart 1: totals
   drawChart(document.getElementById('chart-total'),
     runs.map(r => r.totals.vanilla.duration), runs.map(r => r.totals.stratum.duration), 's');
 
-  // Chart 2: per-scenario with select
   const names = [...new Set(runs.flatMap(r => Object.keys(r.scenarios)))].sort();
   const select = document.getElementById('scenario-select');
   for (const name of names) {
-    const o = document.createElement('option'); o.value = name; o.textContent = name; select.appendChild(o);
+    const o = document.createElement('option'); o.value = name;
+    o.textContent = name.replace('.', ' · ');
+    select.appendChild(o);
   }
   const drawScenario = () => {
     const name = select.value;
@@ -230,13 +341,17 @@
   drawScenario();
 
   // Latest run table
+  document.getElementById('latest-caption').textContent =
+    `Run of ${latest.date.slice(0, 10)} at ${latest.sha.slice(0, 7)} on ${latest.stratum_tag || '?'}.`;
   const tbody = document.querySelector('#latest-table tbody');
   for (const [name, e] of Object.entries(latest.scenarios)) {
     const v = e.v, s = e.s;
+    const [cls, mth] = name.split('.');
     const cell = o => o ? (o[0] === 'Passed' ? '<span class="ok">✓ passed</span>' : '<span class="ko">✗ ' + o[0].toLowerCase() + '</span>') : '➖';
     const delta = v && s ? (s[1] - v[1]).toFixed(1) : '';
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td><code>${name}</code></td><td>${cell(v)}</td><td class="num">${v ? v[1].toFixed(1) : ''}</td>` +
+    tr.innerHTML = `<td class="scen"><span class="cls">${cls}</span><span class="mth">${mth}</span></td>` +
+      `<td>${cell(v)}</td><td class="num">${v ? v[1].toFixed(1) : ''}</td>` +
       `<td>${cell(s)}</td><td class="num">${s ? s[1].toFixed(1) : ''}</td><td class="num">${delta}</td>`;
     tbody.appendChild(tr);
   }
