@@ -1,0 +1,1811 @@
+{
+ "schema": 1,
+ "runs": [
+  {
+   "run_id": "29254124432",
+   "sha": "4435f711e8e8",
+   "date": "2026-07-13T13:31:59Z",
+   "stratum_tag": "v1.22.3-stratum.14",
+   "event": "workflow_dispatch",
+   "scenarios": {
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.57
+     ],
+     "s": [
+      "Passed",
+      3.64
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      1.01
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.18
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 3,
+     "total": 3,
+     "duration": 4.75
+    },
+    "stratum": {
+     "passed": 3,
+     "total": 3,
+     "duration": 4.82
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29255426843",
+   "sha": "00ad267e7be7",
+   "date": "2026-07-13T13:50:57Z",
+   "stratum_tag": "v1.22.3-stratum.14",
+   "event": "push",
+   "scenarios": {
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.64
+     ],
+     "s": [
+      "Passed",
+      3.62
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.01
+     ],
+     "s": [
+      "Passed",
+      1.01
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.18
+     ],
+     "s": [
+      "Passed",
+      0.18
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 3,
+     "total": 3,
+     "duration": 4.82
+    },
+    "stratum": {
+     "passed": 3,
+     "total": 3,
+     "duration": 4.8
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29261295740",
+   "sha": "0b4906699b53",
+   "date": "2026-07-13T15:13:09Z",
+   "stratum_tag": "v1.22.3-stratum.14",
+   "event": "push",
+   "scenarios": {
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.45
+     ],
+     "s": [
+      "Passed",
+      7.68
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.9
+     ],
+     "s": [
+      "Passed",
+      7.45
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.52
+     ],
+     "s": [
+      "Passed",
+      3.52
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      1.0
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 5,
+     "total": 5,
+     "duration": 20.03
+    },
+    "stratum": {
+     "passed": 5,
+     "total": 5,
+     "duration": 19.81
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29261301196",
+   "sha": "12eb8dcac347",
+   "date": "2026-07-13T15:13:14Z",
+   "stratum_tag": "v1.22.3-stratum.14",
+   "event": "push",
+   "scenarios": {
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.01
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.54
+     ],
+     "s": [
+      "Passed",
+      7.56
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.55
+     ],
+     "s": [
+      "Passed",
+      7.77
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.57
+     ],
+     "s": [
+      "Passed",
+      3.51
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      0.99
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.18
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 9,
+     "total": 9,
+     "duration": 19.89
+    },
+    "stratum": {
+     "passed": 9,
+     "total": 9,
+     "duration": 20.07
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29264569208",
+   "sha": "88d6c6abe21a",
+   "date": "2026-07-13T15:59:51Z",
+   "stratum_tag": "v1.22.3-stratum.14",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      4.89
+     ],
+     "s": [
+      "Passed",
+      4.79
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.81
+     ],
+     "s": [
+      "Passed",
+      4.8
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.86
+     ],
+     "s": [
+      "Passed",
+      4.88
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.01
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.45
+     ],
+     "s": [
+      "Passed",
+      7.56
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.55
+     ],
+     "s": [
+      "Passed",
+      7.59
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.57
+     ],
+     "s": [
+      "Passed",
+      3.52
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.01
+     ],
+     "s": [
+      "Passed",
+      1.0
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 12,
+     "total": 12,
+     "duration": 34.35
+    },
+    "stratum": {
+     "passed": 12,
+     "total": 12,
+     "duration": 34.36
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29265988259",
+   "sha": "fd1894d236df",
+   "date": "2026-07-13T16:20:15Z",
+   "stratum_tag": "v1.22.3-stratum.15",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      4.82
+     ],
+     "s": [
+      "Passed",
+      4.8
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.81
+     ],
+     "s": [
+      "Passed",
+      4.79
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.84
+     ],
+     "s": [
+      "Passed",
+      4.79
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.02
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.49
+     ],
+     "s": [
+      "Passed",
+      7.48
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.46
+     ],
+     "s": [
+      "Passed",
+      7.45
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.59
+     ],
+     "s": [
+      "Passed",
+      3.54
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.01
+     ],
+     "s": [
+      "Passed",
+      1.0
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.18
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 12,
+     "total": 12,
+     "duration": 34.24
+    },
+    "stratum": {
+     "passed": 12,
+     "total": 12,
+     "duration": 34.08
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29268268867",
+   "sha": "5a32517148a2",
+   "date": "2026-07-13T16:53:43Z",
+   "stratum_tag": "v1.22.3-stratum.15",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      4.87
+     ],
+     "s": [
+      "Passed",
+      4.96
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.79
+     ],
+     "s": [
+      "Passed",
+      4.8
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.87
+     ],
+     "s": [
+      "Passed",
+      4.83
+     ]
+    },
+    "ChunkPersistenceScenarios.ModifiedColumn_Should_SurviveUnloadReload_When_SavedBeforeUnload": {
+     "v": [
+      "Passed",
+      2.34
+     ],
+     "s": [
+      "Passed",
+      2.46
+     ]
+    },
+    "ChunkPersistenceScenarios.RepeatedCycles_Should_PersistEveryMutation_When_ColumnIsRecycled": {
+     "v": [
+      "Passed",
+      6.71
+     ],
+     "s": [
+      "Passed",
+      6.75
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.01
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.47
+     ],
+     "s": [
+      "Passed",
+      7.66
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.65
+     ],
+     "s": [
+      "Passed",
+      7.61
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.51
+     ],
+     "s": [
+      "Passed",
+      3.52
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      0.99
+     ],
+     "s": [
+      "Passed",
+      1.0
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 14,
+     "total": 14,
+     "duration": 43.42
+    },
+    "stratum": {
+     "passed": 14,
+     "total": 14,
+     "duration": 43.8
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29272633162",
+   "sha": "fc62a62ca93f",
+   "date": "2026-07-13T17:59:15Z",
+   "stratum_tag": "v1.22.3-stratum.15",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      5.0
+     ],
+     "s": [
+      "Passed",
+      5.03
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.93
+     ],
+     "s": [
+      "Passed",
+      4.88
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.91
+     ],
+     "s": [
+      "Passed",
+      4.96
+     ]
+    },
+    "ChunkPersistenceScenarios.ModifiedColumn_Should_SurviveUnloadReload_When_SavedBeforeUnload": {
+     "v": [
+      "Passed",
+      2.39
+     ],
+     "s": [
+      "Passed",
+      2.34
+     ]
+    },
+    "ChunkPersistenceScenarios.RepeatedCycles_Should_PersistEveryMutation_When_ColumnIsRecycled": {
+     "v": [
+      "Passed",
+      6.73
+     ],
+     "s": [
+      "Passed",
+      6.71
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.01
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.05
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.61
+     ],
+     "s": [
+      "Passed",
+      7.62
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.65
+     ],
+     "s": [
+      "Passed",
+      7.56
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.63
+     ],
+     "s": [
+      "Passed",
+      3.7
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      0.99
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 14,
+     "total": 14,
+     "duration": 44.07
+    },
+    "stratum": {
+     "passed": 14,
+     "total": 14,
+     "duration": 44.02
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29291311072",
+   "sha": "868d9d691e1e",
+   "date": "2026-07-13T22:53:05Z",
+   "stratum_tag": "v1.22.3-stratum.15",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      4.98
+     ],
+     "s": [
+      "Passed",
+      4.93
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.9
+     ],
+     "s": [
+      "Passed",
+      4.94
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.96
+     ],
+     "s": [
+      "Passed",
+      5.01
+     ]
+    },
+    "ChunkPersistenceScenarios.ModifiedColumn_Should_SurviveUnloadReload_When_SavedBeforeUnload": {
+     "v": [
+      "Passed",
+      2.38
+     ],
+     "s": [
+      "Passed",
+      2.31
+     ]
+    },
+    "ChunkPersistenceScenarios.RepeatedCycles_Should_PersistEveryMutation_When_ColumnIsRecycled": {
+     "v": [
+      "Passed",
+      6.76
+     ],
+     "s": [
+      "Passed",
+      6.72
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.01
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.05
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.55
+     ],
+     "s": [
+      "Passed",
+      7.85
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.55
+     ],
+     "s": [
+      "Passed",
+      7.54
+     ]
+    },
+    "RandomTickDisabledScenarios.FarPlatform_Should_Convert_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      25.49
+     ],
+     "s": [
+      "Passed",
+      25.51
+     ]
+    },
+    "RandomTickProbes.FarPlatform_Should_ConvertOnVanillaAndStayUntouchedOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      25.6
+     ],
+     "s": [
+      "Passed",
+      25.77
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.63
+     ],
+     "s": [
+      "Passed",
+      3.62
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      1.08
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 16,
+     "total": 16,
+     "duration": 95.02
+    },
+    "stratum": {
+     "passed": 16,
+     "total": 16,
+     "duration": 95.5
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29301030444",
+   "sha": "e55b69e8a7ca",
+   "date": "2026-07-14T02:25:29Z",
+   "stratum_tag": "v1.22.3-stratum.15",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      5.22
+     ],
+     "s": [
+      "Passed",
+      4.9
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.89
+     ],
+     "s": [
+      "Passed",
+      4.92
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.89
+     ],
+     "s": [
+      "Passed",
+      4.9
+     ]
+    },
+    "ChunkPersistenceScenarios.ModifiedColumn_Should_SurviveUnloadReload_When_SavedBeforeUnload": {
+     "v": [
+      "Passed",
+      2.4
+     ],
+     "s": [
+      "Passed",
+      2.42
+     ]
+    },
+    "ChunkPersistenceScenarios.RepeatedCycles_Should_PersistEveryMutation_When_ColumnIsRecycled": {
+     "v": [
+      "Passed",
+      6.74
+     ],
+     "s": [
+      "Passed",
+      6.79
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.55
+     ],
+     "s": [
+      "Passed",
+      7.62
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.54
+     ],
+     "s": [
+      "Passed",
+      7.66
+     ]
+    },
+    "RandomTickDisabledScenarios.FarPlatform_Should_Convert_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      15.5
+     ],
+     "s": [
+      "Passed",
+      15.46
+     ]
+    },
+    "RandomTickProbes.FarPlatform_Should_ConvertOnVanillaAndStayUntouchedOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      15.52
+     ],
+     "s": [
+      "Passed",
+      15.73
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.63
+     ],
+     "s": [
+      "Passed",
+      3.62
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      0.99
+     ],
+     "s": [
+      "Passed",
+      1.02
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 16,
+     "total": 16,
+     "duration": 75.09
+    },
+    "stratum": {
+     "passed": 16,
+     "total": 16,
+     "duration": 75.25
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29302101328",
+   "sha": "374625483c45",
+   "date": "2026-07-14T02:52:01Z",
+   "stratum_tag": "v1.22.3-stratum.15",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      4.94
+     ],
+     "s": [
+      "Passed",
+      4.95
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.93
+     ],
+     "s": [
+      "Passed",
+      4.93
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.96
+     ],
+     "s": [
+      "Passed",
+      4.89
+     ]
+    },
+    "ChunkPersistenceScenarios.ModifiedColumn_Should_SurviveUnloadReload_When_SavedBeforeUnload": {
+     "v": [
+      "Passed",
+      2.46
+     ],
+     "s": [
+      "Passed",
+      2.55
+     ]
+    },
+    "ChunkPersistenceScenarios.RepeatedCycles_Should_PersistEveryMutation_When_ColumnIsRecycled": {
+     "v": [
+      "Passed",
+      6.76
+     ],
+     "s": [
+      "Passed",
+      6.82
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.55
+     ],
+     "s": [
+      "Passed",
+      7.57
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.75
+     ],
+     "s": [
+      "Passed",
+      7.59
+     ]
+    },
+    "RandomTickDisabledScenarios.FarPlatform_Should_Convert_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      15.57
+     ],
+     "s": [
+      "Passed",
+      15.57
+     ]
+    },
+    "RandomTickProbes.FarPlatform_Should_ConvertOnVanillaAndStayUntouchedOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      15.51
+     ],
+     "s": [
+      "Passed",
+      15.52
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.62
+     ],
+     "s": [
+      "Passed",
+      3.62
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      1.0
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 16,
+     "total": 16,
+     "duration": 75.26
+    },
+    "stratum": {
+     "passed": 16,
+     "total": 16,
+     "duration": 75.24
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29303357559",
+   "sha": "d3f23172b241",
+   "date": "2026-07-14T03:22:22Z",
+   "stratum_tag": "v1.22.3-stratum.15",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      4.89
+     ],
+     "s": [
+      "Passed",
+      4.9
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.91
+     ],
+     "s": [
+      "Passed",
+      4.94
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.9
+     ],
+     "s": [
+      "Passed",
+      4.96
+     ]
+    },
+    "ChunkPersistenceScenarios.ModifiedColumn_Should_SurviveUnloadReload_When_SavedBeforeUnload": {
+     "v": [
+      "Passed",
+      2.36
+     ],
+     "s": [
+      "Passed",
+      2.33
+     ]
+    },
+    "ChunkPersistenceScenarios.RepeatedCycles_Should_PersistEveryMutation_When_ColumnIsRecycled": {
+     "v": [
+      "Passed",
+      6.74
+     ],
+     "s": [
+      "Passed",
+      6.8
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.01
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.6
+     ],
+     "s": [
+      "Passed",
+      7.53
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.8
+     ],
+     "s": [
+      "Passed",
+      7.55
+     ]
+    },
+    "RandomTickDisabledScenarios.FarPlatform_Should_Convert_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      1.53
+     ],
+     "s": [
+      "Passed",
+      4.26
+     ]
+    },
+    "RandomTickProbes.FarPlatform_Should_ConvertOnVanillaAndStayUntouchedOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      2.19
+     ],
+     "s": [
+      "Passed",
+      16.59
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.63
+     ],
+     "s": [
+      "Passed",
+      3.64
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      1.0
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 16,
+     "total": 16,
+     "duration": 47.76
+    },
+    "stratum": {
+     "passed": 16,
+     "total": 16,
+     "duration": 64.72
+    }
+   },
+   "parity": true
+  },
+  {
+   "run_id": "29331983358",
+   "sha": "8d73c8f05e03",
+   "date": "2026-07-14T12:18:16Z",
+   "stratum_tag": "v1.22.3-stratum.15",
+   "event": "push",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      4.91
+     ],
+     "s": [
+      "Passed",
+      4.88
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.9
+     ],
+     "s": [
+      "Passed",
+      4.89
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.89
+     ],
+     "s": [
+      "Passed",
+      4.9
+     ]
+    },
+    "ChunkPersistenceScenarios.ModifiedColumn_Should_SurviveUnloadReload_When_SavedBeforeUnload": {
+     "v": [
+      "Passed",
+      2.41
+     ],
+     "s": [
+      "Passed",
+      2.43
+     ]
+    },
+    "ChunkPersistenceScenarios.RepeatedCycles_Should_PersistEveryMutation_When_ColumnIsRecycled": {
+     "v": [
+      "Passed",
+      6.77
+     ],
+     "s": [
+      "Passed",
+      6.81
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.64
+     ],
+     "s": [
+      "Passed",
+      7.57
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      8.03
+     ],
+     "s": [
+      "Passed",
+      7.56
+     ]
+    },
+    "RandomTickDisabledScenarios.FarPlatform_Should_Convert_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      1.55
+     ],
+     "s": [
+      "Passed",
+      1.47
+     ]
+    },
+    "RandomTickProbes.FarPlatform_Should_ConvertOnVanillaAndStayUntouchedOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      1.25
+     ],
+     "s": [
+      "Passed",
+      16.27
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.63
+     ],
+     "s": [
+      "Passed",
+      3.62
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      0.99
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.17
+     ]
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 16,
+     "total": 16,
+     "duration": 47.2
+    },
+    "stratum": {
+     "passed": 16,
+     "total": 16,
+     "duration": 61.6
+    }
+   },
+   "parity": true
+  }
+ ]
+}
