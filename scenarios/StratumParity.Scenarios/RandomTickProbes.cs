@@ -12,24 +12,24 @@ namespace StratumParity.Scenarios;
 /// of probe blocks near the player converts steadily on both flavors, a platform 200
 /// blocks out converts on vanilla and must stay untouched on Stratum.
 ///
-/// Random ticks are sampled (a handful of random positions per chunk per pass), so
-/// assertions are statistical: platforms are large enough that the expected conversion
-/// count is far from the floors, and the Stratum far-platform assertion is exact zero
-/// (outside the radius the chunk is never sampled at all).
+/// The effective conversion rate stacks many engine factors (random sampling, per-chunk
+/// caps, Stratum's per-pass chunk cap with rotation and slice striding, and a
+/// Calendar.SpeedOfTime scale), so positive assertions claim CANDIDACY, not a rate: one
+/// single conversion proves the column is inside the sampled radius (floor of 1, long
+/// converging ceiling). Only the Stratum far-platform assertion is exact zero, which is
+/// rate-insensitive: outside the clamped radius the chunk is never a candidate at all
+/// (decompiled: candidacy is a pure grid scan of server-loaded chunks around each
+/// Playing client's chunk, ±range in all three axes).
 /// </summary>
 [AtlasWorld(Mods = new[] { "mods/randomtickprobe" })]
 public class RandomTickProbes : AtlasScenarioBase
 {
-    // Random ticks sample very few positions per chunk per pass (measured on vanilla:
-    // about 1 conversion per 128 probe blocks per 150 ticks), so platforms are 16x16x4
-    // slabs (1024 blocks in a single column). Positive expectations use converging
-    // Until waits rather than fixed windows: a chunk only enters the candidate set once
-    // the engine's asynchronous bookkeeping catches up (a slow CI runner once measured a
-    // legitimate 0/1024 inside a fixed 450-tick window on vanilla). Only the Stratum
-    // "exact zero" assertion uses a fixed window, opened after the near clock proves
-    // random ticking is live.
-    internal const int ConversionFloor = 3;
-    internal const int ConvergenceTimeoutTicks = 1200;
+    // Platforms are 16x16x4 slabs (1024 blocks in a single column) so that even heavily
+    // throttled sampling produces a first conversion well within the ceiling. The floor
+    // is deliberately "more than zero": rate-based floors proved flaky on slow CI
+    // runners because the engine's stacked rate factors can slow sampling several-fold.
+    internal const int ConversionFloor = 0;
+    internal const int ConvergenceTimeoutTicks = 2400;
     private const int PlatformEdge = 16;
     private const int PlatformLayers = 4;
 
@@ -83,33 +83,45 @@ public class RandomTickProbes : AtlasScenarioBase
         // complete (issue #84, born from this suite's CI crash), so the mass SetBlock
         // below no longer races the build's off-thread item enumeration.
         Atlas.Api.ITestPlayer anchor = await world.JoinPlayer(anchorName);
-        // Random tick candidacy depends on the chunks the server tracks for the client,
-        // and the default view distance puts the far column (128 blocks out) right on
-        // the send boundary: whether it ever became a candidate was a coin flip per run.
-        // A generous view distance makes the far column's candidacy deterministic.
         anchor.Player.WorldData.DesiredViewDistance = 256;
+
+        // The join scatters players around world spawn (SpawnPlayerRandomlyAround,
+        // roughly 15 blocks), which can shift the anchor's CHUNK by one in any
+        // direction: geometry derived from World.Spawn therefore varied by a full chunk
+        // per run, and every random tick flake of this pack traced back to it (a
+        // "distance 4" column that was really at 3 became a Stratum candidate, one at 5
+        // starved the vanilla wait). Pin the anchor to a fixed position, then derive
+        // everything from its ACTUAL chunk.
+        await anchor.TeleportTo(world.Spawn);
         await world.Ticks(5);
 
-        // Vanilla gates random ticks itself: only chunks within BlockTickChunkRange
-        // (5 chunks by default) of a Playing client are sampled at all. Stratum's
-        // LimitRandomTicks merely clamps that range down to RandomTickDistanceBlocks
-        // (96 blocks = 3 chunks by default). The far platform therefore sits at chunk
-        // distance 4: inside the vanilla range, outside the Stratum clamp. An offset of
-        // exactly 128 guarantees distance 4 whatever the spawn's chunk alignment.
-        BlockPos nearAnchor = world.Spawn.AddCopy(8, 1, 8);
-        BlockPos farAnchor = world.Spawn.AddCopy(128, 1, 0);
+        BlockPos anchorPos = anchor.Position;
+        int anchorChunkX = anchorPos.X / 32;
+        int anchorChunkZ = anchorPos.Z / 32;
 
-        // KeepLoaded: the 450-tick window outlives the unload timer for a column with no
-        // player nearby. Safe for the measurement: Stratum's random tick limiting has no
+        // Vanilla gates random ticks itself: only chunks within BlockTickChunkRange
+        // (5 chunks by default) of a Playing client are sampled at all (decompiled:
+        // pure grid scan of server-loaded chunks, ±range on all three axes). Stratum's
+        // LimitRandomTicks merely clamps that range down to RandomTickDistanceBlocks
+        // (96 blocks = 3 chunks by default). The far platform therefore sits in the
+        // column at chunk distance EXACTLY 4 from the anchor's own chunk: inside the
+        // vanilla range, outside the Stratum clamp. Both platforms are padded 8 blocks
+        // into their column so all 16x16 positions stay in a single chunk column.
+        BlockPos nearCorner = new BlockPos(anchorChunkX * 32 + 8, anchorPos.Y + 1, anchorChunkZ * 32 + 8, 0);
+        int farChunkX = anchorChunkX + 4;
+        BlockPos farCorner = new BlockPos(farChunkX * 32 + 8, anchorPos.Y + 1, anchorChunkZ * 32 + 8, 0);
+
+        // KeepLoaded: the observation windows outlive the unload timer for a column
+        // with no player nearby. Safe for the measurement: the random tick limit has no
         // force-loaded exemption (unlike the block listener limit), it gates purely on
-        // player distance, and vanilla random-ticks every loaded column regardless.
-        world.Api.WorldManager.LoadChunkColumnPriority(farAnchor.X / 32, farAnchor.Z / 32,
+        // grid distance to Playing clients.
+        world.Api.WorldManager.LoadChunkColumnPriority(farChunkX, anchorChunkZ,
             new Vintagestory.API.Server.ChunkLoadOptions { KeepLoaded = true });
         await world.Until(
-            () => world.Api.World.BlockAccessor.GetChunkAtBlockPos(farAnchor) != null,
+            () => world.Api.World.BlockAccessor.GetChunkAtBlockPos(farCorner) != null,
             timeoutTicks: 600);
 
-        return (PlacePlatform(world, nearAnchor), PlacePlatform(world, farAnchor));
+        return (PlacePlatform(world, nearCorner), PlacePlatform(world, farCorner));
     }
 
     private static List<BlockPos> PlacePlatform(Atlas.Api.IWorldSession world, BlockPos corner)
