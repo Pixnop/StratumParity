@@ -22,15 +22,9 @@ public class RandomTickDisabledScenarios : AtlasScenarioBase
         (List<BlockPos> near, List<BlockPos> far) =
             await RandomTickProbes.PlacePlatforms(World, "rt-anchor2");
 
-        await World.Ticks(450);
-
-        RandomTickProbes.AssertColumnStillLoaded(World, far[0]);
-        int nearConverted = RandomTickProbes.CountConverted(World, near);
-        int farConverted = RandomTickProbes.CountConverted(World, far);
-
-        Assert.True(nearConverted > 3,
-            $"near platform barely converted ({nearConverted}) on {ServerFlavor.Name}; setup is broken");
-        Assert.True(farConverted > 3,
-            $"far platform untouched on {ServerFlavor.Name} despite LimitRandomTicks=false: {farConverted} converted");
+        // Both platforms must convert; converging waits absorb the engine's asynchronous
+        // chunk bookkeeping (see RandomTickProbes).
+        await RandomTickProbes.WaitForConversions(World, near, "near");
+        await RandomTickProbes.WaitForConversions(World, far, "far");
     }
 }

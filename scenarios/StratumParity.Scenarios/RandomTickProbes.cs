@@ -21,10 +21,15 @@ namespace StratumParity.Scenarios;
 public class RandomTickProbes : AtlasScenarioBase
 {
     // Random ticks sample very few positions per chunk per pass (measured on vanilla:
-    // about 1 conversion per 128 probe blocks per 150 ticks), so the platform is a
-    // 16x16x4 slab (1024 blocks in a single column) and the window 450 ticks: expected
-    // conversions land around 12, far from the floor of 3.
-    private const int MeasurementTicks = 450;
+    // about 1 conversion per 128 probe blocks per 150 ticks), so platforms are 16x16x4
+    // slabs (1024 blocks in a single column). Positive expectations use converging
+    // Until waits rather than fixed windows: a chunk only enters the candidate set once
+    // the engine's asynchronous bookkeeping catches up (a slow CI runner once measured a
+    // legitimate 0/1024 inside a fixed 450-tick window on vanilla). Only the Stratum
+    // "exact zero" assertion uses a fixed window, opened after the near clock proves
+    // random ticking is live.
+    internal const int ConversionFloor = 3;
+    internal const int ConvergenceTimeoutTicks = 1200;
     private const int PlatformEdge = 16;
     private const int PlatformLayers = 4;
 
@@ -33,24 +38,40 @@ public class RandomTickProbes : AtlasScenarioBase
     {
         (List<BlockPos> near, List<BlockPos> far) = await PlacePlatforms(World, "rt-anchor");
 
-        await World.Ticks(MeasurementTicks);
-
-        AssertColumnStillLoaded(World, far[0]);
-        int nearConverted = CountConverted(World, near);
-        int farConverted = CountConverted(World, far);
-
-        Assert.True(nearConverted > 3,
-            $"near platform barely converted ({nearConverted}/{near.Count}) on {ServerFlavor.Name}; setup is broken");
+        await WaitForConversions(World, near, "near");
 
         if (ServerFlavor.IsStratum)
         {
+            // Random ticking is proven live by the near clock; the far column must now
+            // stay untouched over a fixed observation window.
+            await World.Ticks(450);
+            AssertColumnStillLoaded(World, far[0]);
+            int farConverted = CountConverted(World, far);
             Assert.True(farConverted == 0,
                 $"far platform received random ticks on stratum: {farConverted}/{far.Count} converted");
         }
         else
         {
-            Assert.True(farConverted > 3,
-                $"far platform barely converted on vanilla: {farConverted}/{far.Count}");
+            await WaitForConversions(World, far, "far");
+        }
+    }
+
+    internal static async Task WaitForConversions(
+        Atlas.Api.IWorldSession world, List<BlockPos> platform, string label)
+    {
+        try
+        {
+            await world.Until(
+                () => CountConverted(world, platform) > ConversionFloor,
+                timeoutTicks: ConvergenceTimeoutTicks);
+        }
+        catch (Exception)
+        {
+            AssertColumnStillLoaded(world, platform[0]);
+            int converted = CountConverted(world, platform);
+            Assert.Fail(
+                $"{label} platform never reached {ConversionFloor + 1} conversions on {ServerFlavor.Name} " +
+                $"within {ConvergenceTimeoutTicks} ticks ({converted}/{platform.Count} converted)");
         }
     }
 
@@ -61,7 +82,12 @@ public class RandomTickProbes : AtlasScenarioBase
         // Atlas 0.9.1, JoinPlayer itself waits for the server assets packet build to
         // complete (issue #84, born from this suite's CI crash), so the mass SetBlock
         // below no longer races the build's off-thread item enumeration.
-        await world.JoinPlayer(anchorName);
+        Atlas.Api.ITestPlayer anchor = await world.JoinPlayer(anchorName);
+        // Random tick candidacy depends on the chunks the server tracks for the client,
+        // and the default view distance puts the far column (128 blocks out) right on
+        // the send boundary: whether it ever became a candidate was a coin flip per run.
+        // A generous view distance makes the far column's candidacy deterministic.
+        anchor.Player.WorldData.DesiredViewDistance = 256;
         await world.Ticks(5);
 
         // Vanilla gates random ticks itself: only chunks within BlockTickChunkRange
