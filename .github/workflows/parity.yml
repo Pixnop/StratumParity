@@ -79,11 +79,12 @@ jobs:
           }
           if ! run_suite; then
             # A known engine race (StratumServer/Stratum#151) can kill the test host
-            # during a server BOOT, before any scenario runs: BuildServerAssetsPacket
-            # enumerates blocks/items on a pool thread while late boot work mutates
-            # them. Retry once, but only on that exact signature so real regressions
+            # during a server BOOT: BuildServerAssetsPacket enumerates blocks/items on a
+            # pool thread while late boot work mutates them. It surfaces to the test host
+            # as "SendServerAssets failed" and to the server log as "Collection was
+            # modified". Retry once, but only on that exact signature so real regressions
             # keep failing loudly.
-            if grep -q "Collection was modified" test-output.log; then
+            if grep -qE "Collection was modified|SendServerAssets failed" test-output.log; then
               echo "::warning::known engine race (Stratum#151) killed the test host; retrying once"
               rm -rf results
               run_suite

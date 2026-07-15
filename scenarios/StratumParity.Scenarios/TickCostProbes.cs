@@ -43,9 +43,10 @@ public class TickCostProbes : AtlasScenarioBase
 
     public TickCostProbes(ITestOutputHelper output) => this.output = output;
 
-    // FreshWorld: the scenario recycles the class host to a clean world, so its idle baseline is
-    // genuinely idle and nothing leaks into the measurement.
-    [AtlasScenario(FreshWorld = true, TimeoutMs = 300_000)]
+    // No FreshWorld: this class has a single scenario, so its host is already a clean, empty,
+    // player-less superflat world at first run and the idle baseline is genuinely idle. Forcing a
+    // recycle would only add a reboot (and thus more exposure to the Stratum#151 boot race).
+    [AtlasScenario(TimeoutMs = 300_000)]
     public Task TickCost_NearBand() => Measure("near");
 
     private async Task Measure(string label)
