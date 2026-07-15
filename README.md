@@ -21,8 +21,8 @@ a Stratum install, and the results must line up. Scenarios fall into two familie
 
 ## Coverage
 
-16 scenarios, green on both flavors, re-run by CI on every PR and weekly against the
-pinned Stratum release.
+17 scenarios (16 parity + 1 informational perf), green on both flavors, re-run by CI on
+every PR and weekly against the pinned Stratum release.
 
 | Surface | Scenarios | What is pinned down |
 |---|---|---|
@@ -32,6 +32,18 @@ pinned Stratum release.
 | Block tick listeners | `BlockTickListenerProbes`, `BlockTickListenerDisabledScenarios` | Far listeners are skipped entirely on Stratum (128-block radius), force-loaded columns stay exempt, toggle restores parity |
 | Chunk persistence | `ChunkPersistenceScenarios` | Blocks + chunk moddata survive save/unload/reload cycles identically through Stratum's incremental autosave and pooled reads |
 | Random ticks | `RandomTickProbes`, `RandomTickDisabledScenarios` | Vanilla gates random ticks to 5 chunks around Playing clients; Stratum clamps to 3; probed at chunk distance 4 via a staged source mod whose block converts on every random tick |
+| Tick cost (perf) | `TickCostProbes` | Server work-ms per tick under a fixed active-entity load, emitted to the dashboard as a trend; informational, not a pass/fail gate (see below) |
+
+One scenario is a perf measurement rather than a parity check: `TickCostProbes` records the
+server's per-tick work time under a fixed load of active entities and emits it to the dashboard.
+It is **informational, never a pass/fail gate** — vanilla and Stratum run on different CI
+machines (no same-machine pairing) and the engine's tick-cost counter has 1ms integer
+resolution, so a reliable threshold is impossible. The scenario asserts only that the server
+ticked and produced a finite number; the two trend lines on the dashboard are read by a human.
+Locally it shows Stratum's core tick loop at roughly a third of vanilla's cost (its per-tick
+allocation and LINQ reductions). Caveats: headless single-process superflat world, not a
+realistic multiplayer benchmark; numbers near the 1ms floor are trend, not value; the load size
+is a runner-speed-tuned constant. See `scenarios/StratumParity.Scenarios/TickCostReader.cs`.
 
 Field results so far: Stratum's chunk persistence is byte-faithful, its throttles behave
 as documented and their toggles genuinely restore vanilla behavior, and no behavioral

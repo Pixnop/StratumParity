@@ -13,10 +13,25 @@ Idempotent per run id: appending an already-recorded run id is a no-op.
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
 from diff_trx import parse_trx
+
+# Perf pack scenarios emit `ATLAS_METRIC <key>=<number>` lines to their test stdout.
+METRIC_RE = re.compile(r'ATLAS_METRIC\s+(\w+)=([-\d.]+)')
+
+
+def metrics_of(result):
+    """Numeric ATLAS_METRIC values parsed from a test result's stdout, or {} if none."""
+    out = {}
+    for key, value in METRIC_RE.findall(result.get('stdout', '') or ''):
+        try:
+            out[key] = float(value)
+        except ValueError:
+            pass
+    return out
 
 
 def totals(results):
@@ -50,7 +65,9 @@ def main():
     if history_path.exists():
         history = json.loads(history_path.read_text())
     else:
-        history = {'schema': 1, 'runs': []}
+        history = {'schema': 2, 'runs': []}
+    # Schema 2 adds the optional per-scenario 'metrics' key; older runs simply lack it.
+    history['schema'] = max(history.get('schema', 1), 2)
 
     if any(run['run_id'] == args.run_id for run in history['runs']):
         print(f'run {args.run_id} already recorded, nothing to do')
@@ -67,6 +84,22 @@ def main():
             entry['v'] = [vanilla[name]['outcome'], round(vanilla[name]['duration'], 2)]
         if name in stratum:
             entry['s'] = [stratum[name]['outcome'], round(stratum[name]['duration'], 2)]
+
+        # Optional per-scenario perf metrics (only the tick-cost pack emits them). Stored
+        # under an optional 'metrics' key so pre-schema-2 runs simply lack it.
+        v_metrics = metrics_of(vanilla[name]) if name in vanilla else {}
+        s_metrics = metrics_of(stratum[name]) if name in stratum else {}
+        if v_metrics or s_metrics:
+            metrics = {}
+            if v_metrics:
+                metrics['v'] = {k: round(x, 3) for k, x in v_metrics.items()}
+            if s_metrics:
+                metrics['s'] = {k: round(x, 3) for k, x in s_metrics.items()}
+            vt = v_metrics.get('ms_per_tick')
+            st = s_metrics.get('ms_per_tick')
+            if vt and st and vt > 0:
+                metrics['ratio'] = round(st / vt, 3)
+            entry['metrics'] = metrics
         scenarios[short] = entry
 
     parity = all(
