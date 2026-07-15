@@ -50,8 +50,10 @@ def parse_trx(filepath):
         except (ValueError, IndexError):
             duration = 0.0
 
-        # Extract error message for failed tests
+        # Extract error message for failed tests, and the test's stdout (used to carry
+        # ATLAS_METRIC lines from the perf pack; harmless for every other test).
         error_msg = ''
+        stdout = ''
         output_elem = result_elem.find('trx:Output', NS)
         if output_elem is not None:
             error_info = output_elem.find('trx:ErrorInfo', NS)
@@ -59,11 +61,15 @@ def parse_trx(filepath):
                 message_elem = error_info.find('trx:Message', NS)
                 if message_elem is not None and message_elem.text:
                     error_msg = message_elem.text[:300]
+            stdout_elem = output_elem.find('trx:StdOut', NS)
+            if stdout_elem is not None and stdout_elem.text:
+                stdout = stdout_elem.text
 
         results[test_name] = {
             'outcome': outcome,
             'duration': duration,
-            'error': error_msg
+            'error': error_msg,
+            'stdout': stdout,
         }
 
     return results
