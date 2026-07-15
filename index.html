@@ -154,7 +154,7 @@
 
   <section>
     <h2>Total suite duration</h2>
-    <p class="caption">Wall time of the 16-scenario suite per flavor, across runs. Seconds.</p>
+    <p class="caption">Wall time of the full suite per flavor, across runs. Seconds.</p>
     <div class="card">
       <div class="controls">
         <div class="legend">
@@ -178,6 +178,24 @@
         </div>
       </div>
       <svg id="chart-scenario" class="chart" viewBox="0 0 960 270" role="img" aria-label="Per-scenario duration across runs"></svg>
+    </div>
+  </section>
+
+  <section id="perf-section" hidden>
+    <h2>Tick cost</h2>
+    <p class="caption">Server work time per tick under a fixed straw-dummy load, ms/tick. Informational:
+      vanilla and Stratum run on different CI machines, so read each trend on its own, not the gap.
+      Near band measures the core tick loop (comparable across flavors); far band shows Stratum's
+      distance throttle (reads near zero by design).</p>
+    <div class="card">
+      <div class="controls">
+        <select id="perf-select" aria-label="Perf scenario"></select>
+        <div class="legend">
+          <span><span class="sw" style="background:var(--series-1)"></span>vanilla</span>
+          <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
+        </div>
+      </div>
+      <svg id="chart-perf" class="chart" viewBox="0 0 960 270" role="img" aria-label="Per-scenario tick cost across runs"></svg>
     </div>
   </section>
 
@@ -339,6 +357,28 @@
   };
   select.addEventListener('change', drawScenario);
   drawScenario();
+
+  // Tick cost (optional; only scenarios that carry perf metrics, schema 2+). Guarded with
+  // optional chaining so the pre-metrics runs read as null and drawChart renders gaps.
+  const perfMetric = (run, name, flavor) => run.scenarios?.[name]?.metrics?.[flavor]?.ms_per_tick ?? null;
+  const perfNames = [...new Set(runs.flatMap(r =>
+    Object.entries(r.scenarios).filter(([, e]) => e.metrics).map(([n]) => n)))].sort();
+  if (perfNames.length) {
+    document.getElementById('perf-section').hidden = false;
+    const perfSelect = document.getElementById('perf-select');
+    for (const name of perfNames) {
+      const o = document.createElement('option'); o.value = name;
+      o.textContent = name.replace('.', ' · ');
+      perfSelect.appendChild(o);
+    }
+    const drawPerf = () => {
+      const name = perfSelect.value;
+      drawChart(document.getElementById('chart-perf'),
+        runs.map(r => perfMetric(r, name, 'v')), runs.map(r => perfMetric(r, name, 's')), 'ms');
+    };
+    perfSelect.addEventListener('change', drawPerf);
+    drawPerf();
+  }
 
   // Latest run table
   document.getElementById('latest-caption').textContent =
