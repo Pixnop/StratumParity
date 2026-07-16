@@ -22,7 +22,9 @@ a Stratum install, and the results must line up. Scenarios fall into two familie
 ## Coverage
 
 17 scenarios (16 parity + 1 informational perf), green on both flavors, re-run by CI on
-every PR and weekly against the pinned Stratum release.
+every PR and weekly against the pinned Stratum release. A separate daily **indev scout**
+workflow resolves the latest Stratum pre-release and runs the same suite against it:
+non-blocking early warning for the next stable, never mixed into the dashboard trends.
 
 | Surface | Scenarios | What is pinned down |
 |---|---|---|
