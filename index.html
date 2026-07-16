@@ -20,6 +20,8 @@
     --card: #ffffff;
     --border: #e4e3de;
     --accent-soft: #eef4fc;
+    --indev: #b45309;
+    --indev-soft: #fbf0e0;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -33,6 +35,8 @@
       --card: #1f1f1d;
       --border: #34332f;
       --accent-soft: #22293357;
+      --indev: #e5a34b;
+      --indev-soft: #392c1757;
     }
   }
   * { box-sizing: border-box; }
@@ -71,8 +75,17 @@
     color: var(--text-muted); margin-bottom: 4px;
   }
   .tile .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .tile .v.sm { font-size: 16px; line-height: 2.1; }
   .tile .v small { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-left: 2px; }
   .tile .d { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* Build channel pills */
+  .chan {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  }
+  .chan.pinned { background: var(--accent-soft); color: var(--series-1); }
+  .chan.indev { background: var(--indev-soft); color: var(--indev); }
 
   /* Sections and cards */
   section { margin-top: 34px; }
@@ -122,6 +135,8 @@
   tbody tr:hover td { background: var(--accent-soft); }
   th { color: var(--text-muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td a { color: var(--series-1); font-weight: 600; text-decoration: none; }
+  td a:hover { text-decoration: underline; }
   .scen .cls { color: var(--text-muted); font-size: 12px; display: block; }
   .scen .mth { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 12px; }
   .ok { color: var(--status-good); font-weight: 700; white-space: nowrap; }
@@ -147,8 +162,23 @@
   </header>
 
   <section>
+    <h2>Builds</h2>
+    <p class="caption">Every Stratum build the suite has tested: pinned stable releases from the
+      parity lane, and pre-releases from the daily indev scout (non-gating, kept out of the
+      trend charts). Verdict is the build's most recent run; the CI link opens it.</p>
+    <div class="card">
+      <div class="tablewrap">
+      <table id="builds-table">
+        <thead><tr><th>Build</th><th>Channel</th><th>Latest verdict</th><th class="num">Runs</th><th class="num">Scenarios v · s</th><th>Last tested</th><th>CI</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>Run verdicts</h2>
-    <p class="caption">One tile per recorded run: ✓ parity holds, ✗ outcome divergence. Click opens the CI run.</p>
+    <p class="caption">One tile per recorded run on the pinned lane: ✓ parity holds, ✗ outcome divergence. Click opens the CI run.</p>
     <div class="card"><div class="verdicts" id="verdicts"></div></div>
   </section>
 
@@ -218,6 +248,7 @@
   <footer>
     <a href="https://github.com/Pixnop/StratumParity">Repository</a>
     <a href="https://github.com/Pixnop/StratumParity/actions">CI runs</a>
+    <a href="https://github.com/Pixnop/StratumParity/actions/workflows/indev-scout.yml">Indev scout</a>
     <a href="https://github.com/StratumServer/Stratum/issues/147">Stratum #147</a>
     <a href="https://github.com/Pixnop/Atlas">Built on Atlas</a>
   </footer>
@@ -226,12 +257,26 @@
 
 <script>
 (async function () {
-  const resp = await fetch('data/runs.json');
-  const history = await resp.json();
+  // Two histories, one file per lane: runs.json is the pinned parity lane (feeds every
+  // chart below), scout.json is the daily indev lane (feeds only the Builds section and
+  // its tile, and does not exist until the first scout publish). The scout lane is
+  // optional by design, so ANY failure there (404, network, truncated body) degrades to
+  // an empty lane instead of taking the whole dashboard down with it.
+  const scoutsPromise = fetch('data/scout.json')
+    .then(resp => resp.ok ? resp.json() : { runs: [] })
+    .then(data => data.runs || [])
+    .catch(() => []);
+  const history = await (await fetch('data/runs.json')).json();
   const runs = history.runs;
   if (!runs.length) return;
+  const scouts = await scoutsPromise;
   const latest = runs[runs.length - 1];
   const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const shortTag = tag => (tag || '?').replace(/^v[\d.]+-/, '');
+  // Scout tags come from a third-party repo's release list; escape anything that reaches
+  // innerHTML so a hostile tag name cannot inject markup into the dashboard.
+  const esc = s => String(s).replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // Header badge
   const badge = document.getElementById('verdict-badge');
@@ -245,14 +290,49 @@
     { k: 'Scenarios', v: String(Object.keys(latest.scenarios).length), d: 'six covered surfaces' },
     { k: 'Vanilla suite', v: latest.totals.vanilla.duration.toFixed(0), vu: 's', d: `${latest.totals.vanilla.passed}/${latest.totals.vanilla.total} passed` },
     { k: 'Stratum suite', v: latest.totals.stratum.duration.toFixed(0), vu: 's', d: `${latest.totals.stratum.passed}/${latest.totals.stratum.total} passed` },
-    { k: 'Pinned Stratum', v: (latest.stratum_tag || '?').replace('v1.22.3-', ''), d: latest.date.slice(0, 10) + ' @ ' + latest.sha.slice(0, 7) },
+    { k: 'Pinned Stratum', v: shortTag(latest.stratum_tag), d: latest.date.slice(0, 10) + ' @ ' + latest.sha.slice(0, 7) },
   ];
+  if (scouts.length) {
+    const scout = scouts[scouts.length - 1];
+    tiles.push({
+      k: 'Indev scout', v: shortTag(scout.stratum_tag), small: true,
+      d: scout.date.slice(0, 10) + (scout.parity ? ' · ✓ parity' : ' · ✗ divergence'),
+    });
+  }
   const tilesEl = document.getElementById('tiles');
   for (const t of tiles) {
     const div = document.createElement('div');
     div.className = 'tile';
-    div.innerHTML = `<div class="k">${t.k}</div><div class="v">${t.v}${t.vu ? `<small>${t.vu}</small>` : ''}</div><div class="d">${t.d}</div>`;
+    div.innerHTML = `<div class="k">${t.k}</div><div class="v${t.small ? ' sm' : ''}">${esc(t.v)}${t.vu ? `<small>${t.vu}</small>` : ''}</div><div class="d">${esc(t.d)}</div>`;
     tilesEl.appendChild(div);
+  }
+
+  // Builds table: one row per Stratum build ever tested, across both lanes, newest first.
+  const collectBuilds = (list, channel) => {
+    const byTag = new Map();
+    for (const run of list) {
+      const tag = run.stratum_tag || '?';
+      if (!byTag.has(tag)) byTag.set(tag, []);
+      byTag.get(tag).push(run);
+    }
+    return [...byTag.entries()].map(([tag, tagRuns]) => ({ tag, channel, runs: tagRuns }));
+  };
+  const builds = [...collectBuilds(runs, 'pinned'), ...collectBuilds(scouts, 'indev')]
+    .map(b => ({ ...b, last: b.runs[b.runs.length - 1], reds: b.runs.filter(r => !r.parity).length }))
+    .sort((a, b) => Date.parse(b.last.date) - Date.parse(a.last.date));
+  const buildsBody = document.querySelector('#builds-table tbody');
+  for (const b of builds) {
+    const t = b.last.totals;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td class="scen"><span class="mth" title="${esc(b.tag)}">${esc(shortTag(b.tag))}</span></td>` +
+      `<td><span class="chan ${b.channel}">${b.channel}</span></td>` +
+      `<td>${b.last.parity ? '<span class="ok">✓ parity</span>' : '<span class="ko">✗ divergence</span>'}</td>` +
+      `<td class="num">${b.runs.length}${b.reds ? ` <span class="ko">(${b.reds} red)</span>` : ''}</td>` +
+      `<td class="num">${t.vanilla.passed}/${t.vanilla.total} · ${t.stratum.passed}/${t.stratum.total}</td>` +
+      `<td>${b.last.date.slice(0, 10)}</td>` +
+      `<td><a href="https://github.com/Pixnop/StratumParity/actions/runs/${b.last.run_id}">run</a></td>`;
+    buildsBody.appendChild(tr);
   }
 
   // Verdict strip
@@ -324,7 +404,7 @@
       };
       place(dotV, seriesV[best]); place(dotS, seriesS[best]);
       const fmt = v => v == null ? 'n/a' : v.toFixed(1) + unit;
-      tooltip.innerHTML = `<b>${runs[best].date.slice(0, 10)}</b> · ${runs[best].sha.slice(0, 7)} · ${(runs[best].stratum_tag || '').replace('v1.22.3-', '')}` +
+      tooltip.innerHTML = `<b>${runs[best].date.slice(0, 10)}</b> · ${runs[best].sha.slice(0, 7)} · ${shortTag(runs[best].stratum_tag)}` +
         `<div class="row"><span class="sw" style="background:${css('--series-1')}"></span>vanilla ${fmt(seriesV[best])}</div>` +
         `<div class="row"><span class="sw" style="background:${css('--series-2')}"></span>stratum ${fmt(seriesS[best])}</div>`;
       tooltip.style.display = 'block';
