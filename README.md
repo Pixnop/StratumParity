@@ -29,7 +29,7 @@ non-blocking early warning for the next stable, never mixed into the dashboard t
 | Surface | Scenarios | What is pinned down |
 |---|---|---|
 | Boot, block placement, join | `SmokeParityScenarios` | Fundamentals identical on both flavors; a joined player survives Stratum's packet limiter |
-| Entity tick throttling | `EntityTickingProbes`, `EntityTickingDisabledScenarios` | Far entities tick 1 in 10 on Stratum (measured), full rate on vanilla; `EntityTicking.Enabled: false` restores parity |
+| Entity tick throttling | `EntityTickingProbes`, `EntityTickingDisabledScenarios` | Exact counts against the engine entity-simulation tick counter: near entities tick once per sim tick on both flavors, far entities exactly 1 in 10 on Stratum and once per sim tick on vanilla; `EntityTicking.Enabled: false` restores exact parity |
 | Command surface | `CommandParityScenarios` | Vanilla commands behave identically (incl. unknown-command error codes); `/stratum` and `/sethome` exist on Stratum only |
 | Block tick listeners | `BlockTickListenerProbes`, `BlockTickListenerDisabledScenarios` | Far listeners are skipped entirely on Stratum (128-block radius), force-loaded columns stay exempt, toggle restores parity |
 | Chunk persistence | `ChunkPersistenceScenarios` | Blocks + chunk moddata survive save/unload/reload cycles identically through Stratum's incremental autosave and pooled reads |
