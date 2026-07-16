@@ -3,8 +3,10 @@ name: Indev scout
 # Early-warning lane: runs the full suite against the LATEST Stratum pre-release, resolved
 # at run time, and compares it to vanilla. Deliberately separate from the pinned Parity
 # workflow: indev failures are upstream's work in progress, so they never gate PRs and
-# never write to the dashboard history (trends stay stable-only). A red scheduled run here
-# means the next stable bump needs a look, and gives upstream feedback before they ship.
+# never feed the dashboard's trend charts (trends stay stable-only). Each run IS recorded
+# in the lane's own history (data/scout.json on gh-pages) so the dashboard's Builds
+# section shows every build ever tested. A red scheduled run here means the next stable
+# bump needs a look, and gives upstream feedback before they ship.
 
 on:
   workflow_dispatch:
@@ -63,11 +65,14 @@ jobs:
 
       - name: Install and bootstrap Stratum indev
         if: matrix.flavor == 'stratum-indev' && steps.cache-install.outputs.cache-hit != 'true'
+        # The tag is resolved from a third-party repo's release list; it reaches the shell
+        # through the environment, never through template expansion inside the script.
+        env:
+          SCOUT_TAG: ${{ needs.resolve.outputs.tag }}
         run: |
-          tag='${{ needs.resolve.outputs.tag }}'
           mkdir -p ~/install/stratum-indev && cd ~/install/stratum-indev
-          ver="${tag#v}"
-          curl -fsSLO "https://github.com/StratumServer/Stratum/releases/download/${tag}/stratum-${ver}-linux-x64.zip"
+          ver="${SCOUT_TAG#v}"
+          curl -fsSLO "https://github.com/StratumServer/Stratum/releases/download/${SCOUT_TAG}/stratum-${ver}-linux-x64.zip"
           python3 -m zipfile -e "stratum-${ver}-linux-x64.zip" .
           rm "stratum-${ver}-linux-x64.zip"
           chmod +x StratumServer
@@ -108,6 +113,9 @@ jobs:
         with:
           name: trx-${{ matrix.flavor }}
           path: results/*.trx
+          # Re-run attempts share the run's artifact namespace; without this, a retried
+          # leg 409s on the upload and can never go green.
+          overwrite: true
 
       - name: Upload server logs on failure
         if: failure()
@@ -116,6 +124,7 @@ jobs:
           name: server-logs-${{ matrix.flavor }}
           path: /tmp/atlas/*/Logs/*.log
           if-no-files-found: ignore
+          overwrite: true
 
   compare:
     needs: [resolve, scout]
@@ -130,8 +139,77 @@ jobs:
           merge-multiple: true
 
       - name: Diff outcomes
+        env:
+          SCOUT_TAG: ${{ needs.resolve.outputs.tag }}
         run: |
-          echo "# Indev scout: ${{ needs.resolve.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "# Indev scout: ${SCOUT_TAG}" >> "$GITHUB_STEP_SUMMARY"
           python3 scripts/diff_trx.py results/vanilla.trx results/stratum-indev.trx --markdown \
             >> "$GITHUB_STEP_SUMMARY" || true
           python3 scripts/diff_trx.py results/vanilla.trx results/stratum-indev.trx
+
+  publish:
+    # Record this scout run in the indev lane's own history (data/scout.json), read by
+    # the dashboard's Builds section and never by the trend charts. Runs even when the
+    # suite or the comparison failed: a red indev run is exactly the early warning this
+    # lane exists to surface. main only, so a dispatch from a test branch cannot write
+    # a WIP suite's results into the production history.
+    needs: [resolve, scout, compare]
+    if: always() && needs.resolve.result == 'success' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site-out
+
+      - uses: actions/download-artifact@v4
+        # A run that died before uploading anything must not fail the publish job;
+        # the guard below handles the missing files.
+        continue-on-error: true
+        with:
+          path: results
+          merge-multiple: true
+
+      - name: Append this scout run and publish
+        # No concurrency group: at most one pending job per group means a third publish
+        # entering the group CANCELS the pending one, silently dropping that build from
+        # the history. Instead every publish races freely and the loser of a push race
+        # resets onto the fresh branch and replays its append (idempotent per run id).
+        # The checkout action leaves authenticated credentials in the gh-pages clone,
+        # so the push needs no secret handling here.
+        env:
+          SCOUT_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          if [ ! -f results/vanilla.trx ] && [ ! -f results/stratum-indev.trx ]; then
+            echo "::warning::no TRX at all (run died before testing); nothing to record"
+            exit 0
+          fi
+          git -C site-out config user.name "github-actions[bot]"
+          git -C site-out config user.email "github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git -C site-out fetch origin gh-pages
+            git -C site-out reset --hard origin/gh-pages
+            # --missing-ok: an indev whose server never booted still gets a (red) entry,
+            # which is the whole point of scouting it.
+            mkdir -p site-out/data
+            python3 scripts/history_append.py results/vanilla.trx results/stratum-indev.trx \
+              --missing-ok \
+              --history site-out/data/scout.json \
+              --run-id "${{ github.run_id }}" \
+              --sha "${{ github.sha }}" \
+              --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --stratum-tag "${SCOUT_TAG}" \
+              --event "${{ github.event_name }}"
+            git -C site-out add -A
+            git -C site-out diff --cached --quiet || git -C site-out commit -q -m "dashboard: scout run ${{ github.run_id }}"
+            if git -C site-out push origin HEAD:gh-pages; then
+              exit 0
+            fi
+            echo "::warning::gh-pages push lost a race (attempt ${attempt}); replaying on the fresh branch"
+          done
+          echo "gh-pages push failed after 3 attempts"
+          exit 1

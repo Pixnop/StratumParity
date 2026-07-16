@@ -4,9 +4,10 @@ Differential behavior test suite for [Stratum](https://github.com/StratumServer/
 the performance-oriented server fork of Vintage Story. Built on
 [Atlas](https://github.com/Pixnop/Atlas), the in-process integration test harness.
 
-**Dashboard**: [leonfvt.fr/StratumParity](http://leonfvt.fr/StratumParity/) — run history,
-per-flavor and per-scenario duration trends, and the latest parity verdict, republished by
-CI on every main-branch run.
+**Dashboard**: [leonfvt.fr/StratumParity](http://leonfvt.fr/StratumParity/): run history,
+every Stratum build ever tested (pinned stables and scouted indevs), per-flavor and
+per-scenario duration trends, and the latest parity verdict, republished by CI on every
+main-branch run.
 
 Stratum promises performance gains without changing vanilla gameplay behavior. This suite
 puts that promise under test: the same scenarios run against a vanilla install and against
@@ -24,7 +25,8 @@ a Stratum install, and the results must line up. Scenarios fall into two familie
 17 scenarios (16 parity + 1 informational perf), green on both flavors, re-run by CI on
 every PR and weekly against the pinned Stratum release. A separate daily **indev scout**
 workflow resolves the latest Stratum pre-release and runs the same suite against it:
-non-blocking early warning for the next stable, never mixed into the dashboard trends.
+non-blocking early warning for the next stable. Scout runs are recorded in their own
+history and shown in the dashboard's Builds section, never mixed into the stable trends.
 
 | Surface | Scenarios | What is pinned down |
 |---|---|---|
@@ -38,7 +40,7 @@ non-blocking early warning for the next stable, never mixed into the dashboard t
 
 One scenario is a perf measurement rather than a parity check: `TickCostProbes` records the
 server's per-tick work time under a fixed load of active entities and emits it to the dashboard.
-It is **informational, never a pass/fail gate** — vanilla and Stratum run on different CI
+It is **informational, never a pass/fail gate**: vanilla and Stratum run on different CI
 machines (no same-machine pairing) and the engine's tick-cost counter has 1ms integer
 resolution, so a reliable threshold is impossible. The scenario asserts only that the server
 ticked and produced a finite number; the two trend lines on the dashboard are read by a human.
