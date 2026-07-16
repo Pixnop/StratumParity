@@ -99,6 +99,9 @@ jobs:
         with:
           name: trx-${{ matrix.flavor }}
           path: results/*.trx
+          # Re-run attempts share the run's artifact namespace; without this, a retried
+          # leg 409s on the upload and can never go green.
+          overwrite: true
 
       - name: Upload server logs on failure
         if: failure()
@@ -107,6 +110,7 @@ jobs:
           name: server-logs-${{ matrix.flavor }}
           path: /tmp/atlas/*/Logs/*.log
           if-no-files-found: ignore
+          overwrite: true
 
   compare:
     needs: parity
@@ -127,16 +131,16 @@ jobs:
           python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx
 
   publish:
-    # Append this run to the dashboard history and republish the site. main only,
-    # and never on the scheduled sweep (nothing changed to record).
+    # Append this run to the dashboard history and republish the site. main only. Runs
+    # even when the suite or the comparison failed: a red run must show up as a red tile
+    # on the dashboard, not silently vanish from the history. Scheduled sweeps are
+    # recorded too (that is the drift signal the cron exists for), stamped with the run
+    # time since their commit is old news.
     needs: compare
-    if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
+    if: always() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    concurrency:
-      group: gh-pages-publish
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -146,30 +150,54 @@ jobs:
           path: site-out
 
       - uses: actions/download-artifact@v4
+        # A run that died before uploading anything must not block the site republish;
+        # the guard below handles the missing files.
+        continue-on-error: true
         with:
           path: results
           merge-multiple: true
 
-      - name: Append this run
-        run: |
-          mkdir -p site-out/data
-          python3 scripts/history_append.py results/vanilla.trx results/stratum.trx \
-            --history site-out/data/runs.json \
-            --run-id "${{ github.run_id }}" \
-            --sha "${{ github.sha }}" \
-            --date "$(git show -s --format=%cI ${{ github.sha }})" \
-            --stratum-tag "${STRATUM_TAG}" \
-            --event "${{ github.event_name }}"
-          cp site/index.html site-out/index.html
-          touch site-out/.nojekyll
-
-      - name: Publish to gh-pages
+      - name: Append this run and publish
+        # No concurrency group: at most one pending job per group means a third publish
+        # entering the group CANCELS the pending one, silently dropping its history
+        # entry. Instead every publish races freely and the loser of a push race resets
+        # onto the fresh branch and replays its append (idempotent per run id).
         # The checkout action leaves authenticated credentials in the gh-pages clone,
         # so the push needs no secret handling here.
         run: |
-          cd site-out
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet || git commit -q -m "dashboard: run ${{ github.run_id }}"
-          git push origin HEAD:gh-pages
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            run_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          else
+            run_date="$(TZ=UTC0 git show -s --format=%cd --date=format-local:'%Y-%m-%dT%H:%M:%SZ' ${{ github.sha }})"
+          fi
+          git -C site-out config user.name "github-actions[bot]"
+          git -C site-out config user.email "github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git -C site-out fetch origin gh-pages
+            git -C site-out reset --hard origin/gh-pages
+            if [ -f results/vanilla.trx ] || [ -f results/stratum.trx ]; then
+              # --missing-ok: a flavor whose suite never produced results is recorded as
+              # an empty side (red entry), not silently skipped.
+              mkdir -p site-out/data
+              python3 scripts/history_append.py results/vanilla.trx results/stratum.trx \
+                --missing-ok \
+                --history site-out/data/runs.json \
+                --run-id "${{ github.run_id }}" \
+                --sha "${{ github.sha }}" \
+                --date "${run_date}" \
+                --stratum-tag "${STRATUM_TAG}" \
+                --event "${{ github.event_name }}"
+            else
+              echo "::warning::no TRX at all (run died before testing); republishing the site without a new entry"
+            fi
+            cp site/index.html site-out/index.html
+            touch site-out/.nojekyll
+            git -C site-out add -A
+            git -C site-out diff --cached --quiet || git -C site-out commit -q -m "dashboard: run ${{ github.run_id }}"
+            if git -C site-out push origin HEAD:gh-pages; then
+              exit 0
+            fi
+            echo "::warning::gh-pages push lost a race (attempt ${attempt}); replaying on the fresh branch"
+          done
+          echo "gh-pages push failed after 3 attempts"
+          exit 1

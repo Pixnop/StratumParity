@@ -8,13 +8,17 @@ Usage:
       --run-id 123 --sha abcdef --date 2026-07-14T10:00:00Z \
       --stratum-tag v1.22.3-stratum.15 [--event push]
 
-Idempotent per run id: appending an already-recorded run id is a no-op.
+Re-appending a run id REPLACES the previous entry for that id: GitHub re-run attempts
+share the run id, and the re-run's results (say, green after a flaky red) must win.
+With --missing-ok, a missing TRX file counts as an empty suite for that flavor, so a
+run whose server never booted is still recorded (as a divergence) instead of vanishing.
 """
 
 import argparse
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from diff_trx import parse_trx
@@ -52,6 +56,8 @@ def main():
     parser.add_argument('--date', required=True)
     parser.add_argument('--stratum-tag', default='')
     parser.add_argument('--event', default='')
+    parser.add_argument('--missing-ok', action='store_true',
+                        help='treat a missing TRX file as an empty suite for that flavor')
     args = parser.parse_args()
 
     # The history file is always somewhere under the caller's working tree (the
@@ -69,12 +75,19 @@ def main():
     # Schema 2 adds the optional per-scenario 'metrics' key; older runs simply lack it.
     history['schema'] = max(history.get('schema', 1), 2)
 
-    if any(run['run_id'] == args.run_id for run in history['runs']):
-        print(f'run {args.run_id} already recorded, nothing to do')
-        return
+    # A re-run attempt shares the run id; its results replace the earlier attempt's.
+    before = len(history['runs'])
+    history['runs'] = [run for run in history['runs'] if run['run_id'] != args.run_id]
+    if len(history['runs']) < before:
+        print(f'run {args.run_id} already recorded, replacing its entry')
 
-    vanilla = parse_trx(args.vanilla_trx)
-    stratum = parse_trx(args.stratum_trx)
+    def parse_side(path):
+        if args.missing_ok and not Path(path).exists():
+            return {}
+        return parse_trx(path)
+
+    vanilla = parse_side(args.vanilla_trx)
+    stratum = parse_side(args.stratum_trx)
 
     scenarios = {}
     for name in sorted(set(vanilla) | set(stratum)):
@@ -117,7 +130,9 @@ def main():
         'totals': {'vanilla': totals(vanilla), 'stratum': totals(stratum)},
         'parity': parity,
     })
-    history['runs'].sort(key=lambda run: run['date'])
+    # Parse, don't string-compare: recorded dates mix UTC and +02:00 offsets, and a raw
+    # string sort is not chronological across offsets.
+    history['runs'].sort(key=lambda run: datetime.fromisoformat(run['date']))
 
     history_path.parent.mkdir(parents=True, exist_ok=True)
     # NOSONAR below: the path is resolved and confined to the working tree at the top
