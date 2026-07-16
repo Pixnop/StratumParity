@@ -5,10 +5,11 @@ namespace StratumParity.Scenarios;
 
 /// <summary>
 /// Same probe as <see cref="EntityTickingProbes"/>, but the seeded
-/// stratum-performance.json turns Performance.EntityTicking off before boot. Stratum must
-/// then tick far entities at full rate again; vanilla ignores the file entirely. One
-/// unconditional assertion therefore proves parity on both flavors, and proves that the
-/// config toggle actually restores vanilla behavior on Stratum.
+/// stratum-performance.json turns Performance.EntityTicking off before boot. With the
+/// throttle off, BOTH dummies are unthrottled everywhere, so the Atlas tick contract
+/// guarantees exact counts on both flavors: near and far must each tick exactly once per
+/// entity-simulation tick. One pair of exact assertions proves parity AND proves the
+/// config toggle genuinely restores vanilla behavior on Stratum.
 ///
 /// The fixture must also seed a stratum.json: StratumRuntime.LoadOrCreateConfig only
 /// reads stratum-performance.json when stratum.json already exists, otherwise it writes
@@ -20,21 +21,23 @@ public class EntityTickingDisabledScenarios : AtlasScenarioBase
     [AtlasScenario(TimeoutMs = 120_000)]
     public async Task FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig()
     {
-        (TickCounterBehavior near, TickCounterBehavior far) =
-            await EntityTickingProbes.SpawnProbePair(World);
+        EntityTickingProbes.ProbePair pair = await EntityTickingProbes.SpawnProbePair(World);
 
-        int nearBefore = near.Ticks;
-        int farBefore = far.Ticks;
+        int nearBefore = pair.Near.Ticks;
+        int farBefore = pair.Far.Ticks;
+        long simBefore = World.EntitySimulationTicks;
         await World.Ticks(150);
-        int nearDelta = near.Ticks - nearBefore;
-        int farDelta = far.Ticks - farBefore;
+        long simDelta = World.EntitySimulationTicks - simBefore;
+        int nearDelta = pair.Near.Ticks - nearBefore;
+        int farDelta = pair.Far.Ticks - farBefore;
 
-        Assert.True(nearDelta > 37,
-            $"near probe barely ticked ({nearDelta}/150) on {ServerFlavor.Name}; setup is broken");
+        EntityTickingProbes.AssertAnchorStillNear(pair);
+        Assert.True(simDelta > 0, $"no entity-simulation ticks elapsed on {ServerFlavor.Name}");
 
-        double ratio = (double)farDelta / nearDelta;
-        Assert.True(ratio > 0.8,
+        Assert.True(nearDelta == simDelta,
+            $"near probe not exact on {ServerFlavor.Name}: {nearDelta} ticks vs {simDelta} sim ticks");
+        Assert.True(farDelta == simDelta,
             $"far probe throttled on {ServerFlavor.Name} despite EntityTicking.Enabled=false: " +
-            $"far={farDelta} near={nearDelta} ratio={ratio:F2}");
+            $"{farDelta} ticks vs {simDelta} sim ticks");
     }
 }

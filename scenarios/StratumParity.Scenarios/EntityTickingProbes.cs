@@ -1,6 +1,5 @@
 using Atlas.Api;
 using Atlas.XUnit;
-using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Xunit;
@@ -9,71 +8,88 @@ namespace StratumParity.Scenarios;
 
 /// <summary>
 /// Probes Stratum's distance-banded entity ticking (Performance.EntityTicking, enabled by
-/// default). Two identical item entities are spawned: one near the only player (near band,
-/// ticks every server tick on both flavors) and one 200 blocks away (beyond the far band).
-/// Vanilla ticks both at full rate; Stratum ticks the far one every VeryFarTickInterval
-/// (10 by default). The near entity doubles as the tick clock, so assertions are ratios
-/// and stay robust against wall-clock noise.
+/// default) with EXACT counts against Atlas 0.10.0's EntitySimulationTicks, the engine's own
+/// entity-simulation tick counter. Per the Atlas tick contract, an entity that stays
+/// unthrottled for the whole window ticks exactly once per entity-simulation tick, so:
+/// - the near dummy (8 blocks from the anchor, well inside the fork's 32-block near band
+///   with drift margin) must tick EXACTLY simDelta times on both flavors;
+/// - the far dummy (200 blocks, beyond every band) must tick exactly simDelta on vanilla,
+///   and simDelta/VeryFarTickInterval (1 in 10, within stride phase) on Stratum.
+///
+/// Anchoring rules from the contract: the player is teleported to a fixed position first
+/// (the join scatters players ~15 blocks, which once put this very probe's near dummy in
+/// the fork's mid band on some runs), geometry derives from the anchor's actual position
+/// read after the teleport settles, and the end of the window re-checks the anchor-dummy
+/// distance as setup-failure semantics so a drift can never read as a wrong count.
 /// </summary>
 public class EntityTickingProbes : AtlasScenarioBase
 {
     private const int MeasurementTicks = 150;
+    private const int StratumVeryFarInterval = 10;
 
     [AtlasScenario(TimeoutMs = 120_000)]
     public async Task FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive()
     {
-        (TickCounterBehavior near, TickCounterBehavior far) = await SpawnProbePair(World);
+        ProbePair pair = await SpawnProbePair(World);
 
-        int nearBefore = near.Ticks;
-        int farBefore = far.Ticks;
+        int nearBefore = pair.Near.Ticks;
+        int farBefore = pair.Far.Ticks;
+        long simBefore = World.EntitySimulationTicks;
         await World.Ticks(MeasurementTicks);
-        int nearDelta = near.Ticks - nearBefore;
-        int farDelta = far.Ticks - farBefore;
+        long simDelta = World.EntitySimulationTicks - simBefore;
+        int nearDelta = pair.Near.Ticks - nearBefore;
+        int farDelta = pair.Far.Ticks - farBefore;
 
-        // The near probe is the tick clock, not an absolute-rate assertion: observed rates
-        // differ between flavors even in the near band (Stratum ticks entities at roughly
-        // half the harness tick rate across the board). The sanity floor only catches a
-        // dead clock.
-        Assert.True(nearDelta > MeasurementTicks / 4,
-            $"near probe barely ticked ({nearDelta}/{MeasurementTicks}) on {ServerFlavor.Name}; setup is broken");
+        AssertAnchorStillNear(pair);
+        Assert.True(simDelta > 0, $"no entity-simulation ticks elapsed on {ServerFlavor.Name}");
 
-        double ratio = (double)farDelta / nearDelta;
+        // Exact on both flavors: an unthrottled entity ticks once per entity-simulation tick.
+        Assert.True(nearDelta == simDelta,
+            $"near probe not exact on {ServerFlavor.Name}: {nearDelta} ticks vs {simDelta} sim ticks");
+
         if (ServerFlavor.IsStratum)
         {
-            // Default far throttling is 1 tick in 10; anything under half rate proves the
-            // throttle is active without being brittle about the exact stride.
-            Assert.True(ratio < 0.5,
-                $"far probe not throttled on stratum: far={farDelta} near={nearDelta} ratio={ratio:F2}");
+            // Throttled at VeryFarTickInterval: exact up to stride phase at the window edges.
+            long expected = simDelta / StratumVeryFarInterval;
+            Assert.True(Math.Abs(farDelta - expected) <= 2,
+                $"far probe off the 1-in-{StratumVeryFarInterval} stride on stratum: " +
+                $"{farDelta} ticks vs {expected} expected over {simDelta} sim ticks");
         }
         else
         {
-            Assert.True(ratio > 0.8,
-                $"far probe throttled on vanilla: far={farDelta} near={nearDelta} ratio={ratio:F2}");
+            Assert.True(farDelta == simDelta,
+                $"far probe not exact on vanilla: {farDelta} ticks vs {simDelta} sim ticks");
         }
     }
 
+    internal sealed record ProbePair(
+        ITestPlayer Anchor, BlockPos NearPos, TickCounterBehavior Near, TickCounterBehavior Far);
+
     /// <summary>
-    /// Shared setup for the ticking probes: a player as the distance anchor, one counted
-    /// item entity next to them, one far beyond every Stratum band, both settled to rest
-    /// (Stratum does not throttle moving entities, so measurement starts once stationary).
+    /// Shared setup: a Playing anchor player teleported to a fixed position, one counted
+    /// stationary dummy 8 blocks from it (near band with drift margin), one 200 blocks out
+    /// in a kept-loaded column, both settled to rest before measuring (Stratum does not
+    /// throttle moving entities).
     /// </summary>
-    internal static async Task<(TickCounterBehavior Near, TickCounterBehavior Far)> SpawnProbePair(
-        IWorldSession world)
+    internal static async Task<ProbePair> SpawnProbePair(IWorldSession world)
     {
-        const int farDistanceBlocks = 200;
+        ITestPlayer anchor = await world.JoinPlayer("tick-anchor");
+        await world.Ticks(2);
+        // Pin the anchor: the join scatters players around spawn, and every distance band
+        // is measured from the nearest Playing client. Read the position only after the
+        // teleport settles.
+        await anchor.TeleportTo(world.Spawn);
+        await world.Ticks(2);
+        BlockPos anchorPos = anchor.Position;
 
-        // The player is the reference point of every distance band. Without one, Stratum
-        // has no anchor and vanilla tracking deactivates entities too. Stratum only
-        // counts IsPlayingClient clients; since Atlas 0.9.0, JoinPlayer completes the
-        // real join sequence and the player reaches Playing on its own.
-        await world.JoinPlayer("tick-anchor");
-        await world.Ticks(5);
+        BlockPos nearPos = anchorPos.AddCopy(8, 1, 0);
+        BlockPos farPos = anchorPos.AddCopy(200, 1, 0);
 
-        BlockPos nearPos = world.Spawn.AddCopy(5, 1, 0);
-        BlockPos farPos = world.Spawn.AddCopy(farDistanceBlocks, 1, 0);
-
-        // Keep the far column loaded server-side; there is no player near it to do so.
-        world.Api.WorldManager.LoadChunkColumnPriority(farPos.X / 32, farPos.Z / 32);
+        // KeepLoaded: no player is near the far column to keep it alive, and the entity
+        // throttle has no force-loaded exemption (unlike the block listener limit), so
+        // this cannot bias the measurement.
+        world.Api.WorldManager.LoadChunkColumnPriority(farPos.X / 32, farPos.Z / 32,
+            new Vintagestory.API.Server.ChunkLoadOptions { KeepLoaded = true });
         await world.Until(
             () => world.Api.World.BlockAccessor.GetChunkAtBlockPos(farPos) != null,
             timeoutTicks: 600);
@@ -82,7 +98,20 @@ public class EntityTickingProbes : AtlasScenarioBase
         TickCounterBehavior far = SpawnCountedDummy(world, farPos);
 
         await world.Ticks(60);
-        return (near, far);
+        return new ProbePair(anchor, nearPos, near, far);
+    }
+
+    /// <summary>End-of-window guard, setup-failure semantics: if the anchor drifted toward
+    /// the band boundary (entity spawns can nudge players), the run is invalid rather than
+    /// silently miscounted.</summary>
+    internal static void AssertAnchorStillNear(ProbePair pair)
+    {
+        BlockPos p = pair.Anchor.Position;
+        double dx = p.X - pair.NearPos.X;
+        double dz = p.Z - pair.NearPos.Z;
+        double distance = Math.Sqrt(dx * dx + dz * dz);
+        Assert.True(distance < 32,
+            $"anchor drifted to {distance:F1} blocks from the near dummy (band boundary is 32); setup is invalid");
     }
 
     private static TickCounterBehavior SpawnCountedDummy(IWorldSession world, BlockPos pos)
