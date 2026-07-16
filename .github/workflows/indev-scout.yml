@@ -1,0 +1,137 @@
+name: Indev scout
+
+# Early-warning lane: runs the full suite against the LATEST Stratum pre-release, resolved
+# at run time, and compares it to vanilla. Deliberately separate from the pinned Parity
+# workflow: indev failures are upstream's work in progress, so they never gate PRs and
+# never write to the dashboard history (trends stay stable-only). A red scheduled run here
+# means the next stable bump needs a look, and gives upstream feedback before they ship.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily: the indev line moves every day or two.
+    - cron: '0 7 * * *'
+
+env:
+  VS_VERSION: '1.22.3'
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+    steps:
+      - name: Pick the latest pre-release
+        id: pick
+        run: |
+          tag=$(curl -fsSL "https://api.github.com/repos/StratumServer/Stratum/releases?per_page=10" \
+            | python3 -c "import sys, json; releases = json.load(sys.stdin); print(next(r['tag_name'] for r in releases if r['prerelease']))")
+          echo "latest pre-release: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  scout:
+    needs: resolve
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [vanilla, stratum-indev]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache game install
+        id: cache-install
+        uses: actions/cache@v4
+        with:
+          path: ~/install/${{ matrix.flavor }}
+          key: install-${{ matrix.flavor }}-${{ env.VS_VERSION }}-${{ needs.resolve.outputs.tag }}
+
+      - name: Install vanilla server
+        if: matrix.flavor == 'vanilla' && steps.cache-install.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/install/vanilla
+          curl -fsSL "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_${VS_VERSION}.tar.gz" \
+            | tar -xz -C ~/install/vanilla
+          if [ -d ~/install/vanilla/server ]; then
+            mv ~/install/vanilla/server/* ~/install/vanilla/
+            rmdir ~/install/vanilla/server
+          fi
+
+      - name: Install and bootstrap Stratum indev
+        if: matrix.flavor == 'stratum-indev' && steps.cache-install.outputs.cache-hit != 'true'
+        run: |
+          tag='${{ needs.resolve.outputs.tag }}'
+          mkdir -p ~/install/stratum-indev && cd ~/install/stratum-indev
+          ver="${tag#v}"
+          curl -fsSLO "https://github.com/StratumServer/Stratum/releases/download/${tag}/stratum-${ver}-linux-x64.zip"
+          python3 -m zipfile -e "stratum-${ver}-linux-x64.zip" .
+          rm "stratum-${ver}-linux-x64.zip"
+          chmod +x StratumServer
+          ./StratumServer --dataPath /tmp/stratum-boot > boot.log 2>&1 &
+          boot_pid=$!
+          for i in $(seq 1 150); do
+            grep -q "Dedicated Server now running" boot.log && break
+            kill -0 "$boot_pid" 2>/dev/null || { cat boot.log; exit 1; }
+            sleep 4
+          done
+          grep -q "Dedicated Server now running" boot.log || { cat boot.log; exit 1; }
+          kill -INT "$boot_pid"; sleep 5; kill "$boot_pid" 2>/dev/null || true
+          rm -rf /tmp/stratum-boot
+
+      - name: Run scenarios
+        run: |
+          export VINTAGE_STORY="$HOME/install/${{ matrix.flavor }}"
+          run_suite() {
+            dotnet test scenarios/StratumParity.Scenarios -c Release \
+              --logger "trx;LogFileName=${{ matrix.flavor }}.trx" \
+              --results-directory results 2>&1 | tee test-output.log
+            return "${PIPESTATUS[0]}"
+          }
+          if ! run_suite; then
+            # Same known-race retry as the Parity workflow (StratumServer/Stratum#151).
+            if grep -qE "Collection was modified|SendServerAssets failed" test-output.log; then
+              echo "::warning::known engine race (Stratum#151) killed the test host; retrying once"
+              rm -rf results
+              run_suite
+            else
+              exit 1
+            fi
+          fi
+
+      - name: Upload TRX
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trx-${{ matrix.flavor }}
+          path: results/*.trx
+
+      - name: Upload server logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs-${{ matrix.flavor }}
+          path: /tmp/atlas/*/Logs/*.log
+          if-no-files-found: ignore
+
+  compare:
+    needs: [resolve, scout]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: results
+          merge-multiple: true
+
+      - name: Diff outcomes
+        run: |
+          echo "# Indev scout: ${{ needs.resolve.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/diff_trx.py results/vanilla.trx results/stratum-indev.trx --markdown \
+            >> "$GITHUB_STEP_SUMMARY" || true
+          python3 scripts/diff_trx.py results/vanilla.trx results/stratum-indev.trx
