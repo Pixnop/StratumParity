@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Differential runner: builds and runs the scenario suite against two installs,
-# then compares the TRX outputs.
+# Differential runner: builds the scenario suite once, then stages and runs it
+# against two installs, and compares the TRX outputs with `atlas diff`.
 #
 # Usage: scripts/run-parity.sh <vanilla-install> <stratum-install>
 #
-# A full rebuild per install is deliberate. The test assembly copies
-# VintagestoryAPI.dll into its output directory (test method bodies reference API
-# types, so the copy is required); that copy must come from the install the run
-# targets, otherwise the fork's VintagestoryLib and the vanilla API mix and the
-# server fails at boot with MissingFieldException.
+# One build, two staged runs. `atlas stage` copies the target install's
+# VintagestoryAPI.dll+pdb into the built test output before each run, so the
+# fork's VintagestoryLib never runs against the vanilla API copy (that mix
+# fails at boot with MissingFieldException). Requires the Atlas CLI 0.11+:
+#   dotnet tool install -g Pixnop.Atlas.Cli
 
 if [[ $# -ne 2 ]]; then
   echo "Usage: $0 <vanilla-install> <stratum-install>" >&2
+  exit 2
+fi
+
+if ! command -v atlas >/dev/null 2>&1; then
+  echo "atlas CLI not found; install it with: dotnet tool install -g Pixnop.Atlas.Cli" >&2
   exit 2
 fi
 
@@ -22,13 +27,19 @@ stratum="$(cd -- "$2" && pwd)"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/.." && pwd)"
 results="$repo_root/results"
+outdir="$repo_root/scenarios/StratumParity.Scenarios/bin/Release/net10.0"
 mkdir -p "$results"
+
+echo "== Build (once) =="
+( cd "$repo_root" \
+  && VINTAGE_STORY="$vanilla" dotnet build scenarios/StratumParity.Scenarios -c Release )
 
 run_suite() {
   local label="$1" install="$2"
   echo "== $label ($install) =="
   ( cd "$repo_root" \
-    && VINTAGE_STORY="$install" dotnet test scenarios/StratumParity.Scenarios -c Release \
+    && VINTAGE_STORY="$install" atlas stage "$outdir" \
+    && VINTAGE_STORY="$install" dotnet test scenarios/StratumParity.Scenarios -c Release --no-build \
          --logger "trx;LogFileName=$label.trx" --results-directory "$results" )
 }
 
@@ -37,4 +48,4 @@ run_suite stratum "$stratum"
 
 echo
 echo "== Comparison =="
-python3 "$script_dir/diff_trx.py" "$results/vanilla.trx" "$results/stratum.trx"
+atlas diff "$results/vanilla.trx" "$results/stratum.trx"

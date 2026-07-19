@@ -74,15 +74,18 @@ VINTAGE_STORY=~/.local/share/vintagestory dotnet test -c Release
 VINTAGE_STORY=~/dev/stratum-install dotnet test -c Release
 ```
 
-Both installs plus a comparison report:
+Both installs plus a comparison report (requires the Atlas CLI:
+`dotnet tool install -g Pixnop.Atlas.Cli`):
 
 ```bash
 scripts/run-parity.sh ~/.local/share/vintagestory ~/dev/stratum-install
 ```
 
-The script rebuilds per install on purpose: the test assembly copies `VintagestoryAPI.dll`
-into its output, and that copy must match the install the run targets (mixing a fork's
-`VintagestoryLib` with the vanilla API produces `MissingFieldException` at boot).
+The script builds once, then `atlas stage` swaps the install's `VintagestoryAPI.dll`
+into the test output before each run: the copy must match the install the run targets
+(mixing a fork's `VintagestoryLib` with the vanilla API produces `MissingFieldException`
+at boot), and staging replaces the full rebuild per install that guaranteed this before
+Atlas 0.11.
 
 ## Layout
 
@@ -94,11 +97,12 @@ into its output, and that copy must match the install the run targets (mixing a 
 - `scenarios/StratumParity.Scenarios/fixtures/`: seeded Stratum configs for the toggle
   scenarios (each includes `stratum.json`: the performance file is only read when the
   main config exists)
-- `scripts/run-parity.sh`: differential runner (two builds, two runs, one diff)
-- `scripts/diff_trx.py`: TRX comparison tool (outcome diffs, timing deltas)
+- `scripts/run-parity.sh`: differential runner (one build, two staged runs, one diff)
+- `scripts/render_summary.py`: renders the CI job summary from `atlas diff --json-tests`
+  output and gates on parity (symmetric divergence check)
 
 ## Versions
 
-Pinned expectations: Vintage Story 1.22.3, Stratum v1.22.3-stratum.15, Atlas 0.10.0.
+Pinned expectations: Vintage Story 1.22.3, Stratum v1.22.3-stratum.15, Atlas 0.11.0.
 Stratum moves fast (releases every few days); when a scenario starts failing on a new
 Stratum release, that is the suite doing its job.
