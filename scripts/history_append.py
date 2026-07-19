@@ -25,7 +25,9 @@ from pathlib import Path
 # Perf pack scenarios emit `ATLAS_METRIC <key>=<number>` lines to their test stdout.
 METRIC_RE = re.compile(r'ATLAS_METRIC\s+(\w+)=([-\d.]+)')
 
-TRX_NS = {'trx': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
+# NOSONAR below: this is the XML namespace identifier mandated by the TRX schema,
+# a fixed string compared against the document, never a URL that gets fetched.
+TRX_NS = {'trx': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}  # NOSONAR
 
 
 def parse_trx(filepath):

@@ -13,6 +13,7 @@ candidate regressions, this check is symmetric, matching what parity means
 
 import json
 import sys
+from pathlib import Path
 
 BADGE = {'passed': '✅', 'failed': '❌', 'skipped': '⏭️'}
 
@@ -43,7 +44,17 @@ def main():
         print(__doc__, file=sys.stderr)
         sys.exit(2)
 
-    with open(sys.argv[1], encoding='utf-8') as fh:
+    # The diff file always lives in the caller's working tree (the CI job writes
+    # ./diff.json); refuse anything that resolves outside it so a bad argument
+    # cannot read elsewhere on the filesystem.
+    diff_path = Path(sys.argv[1]).resolve()
+    workdir = Path.cwd().resolve()
+    if not diff_path.is_relative_to(workdir):
+        sys.exit(f'refusing to read a diff file outside {workdir}: {diff_path}')
+
+    # NOSONAR below: the path is resolved and confined to the working tree just
+    # above; Sonar's taint analysis does not recognize that sanitizer.
+    with open(diff_path, encoding='utf-8') as fh:  # NOSONAR
         doc = json.load(fh)
     tests = sorted(doc.get('tests') or [], key=lambda t: short_name(t['test']))
 
