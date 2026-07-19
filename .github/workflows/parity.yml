@@ -119,16 +119,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Atlas CLI
+        run: dotnet tool install -g Pixnop.Atlas.Cli --version 0.11.0
+
       - uses: actions/download-artifact@v4
         with:
           path: results
           merge-multiple: true
 
       - name: Diff outcomes
+        # atlas diff produces the per-test JSON; render_summary.py writes the job
+        # summary AND is the parity gate (exit 1 on any divergence). The gate lives
+        # in the renderer because parity is symmetric: atlas diff's own exit code
+        # only flags candidate regressions, a vanilla-only failure must fail too.
         run: |
-          python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx --markdown \
-            >> "$GITHUB_STEP_SUMMARY" || true
-          python3 scripts/diff_trx.py results/vanilla.trx results/stratum.trx
+          atlas diff results/vanilla.trx results/stratum.trx --json-tests > diff.json || true
+          python3 scripts/render_summary.py diff.json >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     # Append this run to the dashboard history and republish the site. main only. Runs

@@ -18,13 +18,48 @@ import argparse
 import json
 import re
 import sys
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
-from diff_trx import parse_trx
-
 # Perf pack scenarios emit `ATLAS_METRIC <key>=<number>` lines to their test stdout.
 METRIC_RE = re.compile(r'ATLAS_METRIC\s+(\w+)=([-\d.]+)')
+
+TRX_NS = {'trx': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
+
+
+def parse_trx(filepath):
+    """testName -> {'outcome', 'duration' (s), 'stdout'} from a TRX report.
+
+    The history needs stdout from BOTH flavors (the perf metrics ride in it), which
+    is why this stays a TRX parse instead of consuming `atlas diff --json-tests`:
+    that document only carries the candidate side's stdout.
+    """
+    try:
+        root = ET.parse(filepath).getroot()
+    except (OSError, ET.ParseError) as e:
+        sys.exit(f'cannot read TRX {filepath}: {e}')
+
+    results = {}
+    for result in root.findall('.//trx:UnitTestResult', TRX_NS):
+        parts = (result.get('duration') or '0').split(':')
+        try:
+            duration = (int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+                        if len(parts) == 3 else 0.0)
+        except ValueError:
+            duration = 0.0
+        stdout = ''
+        output = result.find('trx:Output', TRX_NS)
+        if output is not None:
+            stdout_elem = output.find('trx:StdOut', TRX_NS)
+            if stdout_elem is not None and stdout_elem.text:
+                stdout = stdout_elem.text
+        results[result.get('testName', 'Unknown')] = {
+            'outcome': result.get('outcome', 'Unknown'),
+            'duration': duration,
+            'stdout': stdout,
+        }
+    return results
 
 
 def metrics_of(result):

@@ -133,19 +133,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Atlas CLI
+        run: dotnet tool install -g Pixnop.Atlas.Cli --version 0.11.0
+
       - uses: actions/download-artifact@v4
         with:
           path: results
           merge-multiple: true
 
       - name: Diff outcomes
+        # Same gate as the Parity workflow: render_summary.py exits 1 on any
+        # divergence, symmetric across flavors.
         env:
           SCOUT_TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           echo "# Indev scout: ${SCOUT_TAG}" >> "$GITHUB_STEP_SUMMARY"
-          python3 scripts/diff_trx.py results/vanilla.trx results/stratum-indev.trx --markdown \
-            >> "$GITHUB_STEP_SUMMARY" || true
-          python3 scripts/diff_trx.py results/vanilla.trx results/stratum-indev.trx
+          atlas diff results/vanilla.trx results/stratum-indev.trx --json-tests > diff.json || true
+          python3 scripts/render_summary.py diff.json >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     # Record this scout run in the indev lane's own history (data/scout.json), read by
