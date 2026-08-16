@@ -5780,6 +5780,211 @@
     }
    },
    "parity": true
+  },
+  {
+   "run_id": "31933984366",
+   "sha": "191bf90dac03",
+   "date": "2026-08-16T07:33:20Z",
+   "stratum_tag": "v1.22.6-stratum.3-indev.2",
+   "event": "schedule",
+   "scenarios": {
+    "BlockTickListenerDisabledScenarios.FarListener_Should_FireFullRate_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      4.98
+     ],
+     "s": [
+      "Passed",
+      4.91
+     ]
+    },
+    "BlockTickListenerProbes.FarListener_Should_FireOnVanillaAndFreezeOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      4.89
+     ],
+     "s": [
+      "Passed",
+      4.97
+     ]
+    },
+    "BlockTickListenerProbes.ForceLoadedFarListener_Should_KeepFiring_When_ColumnIsKeptLoaded": {
+     "v": [
+      "Passed",
+      4.96
+     ],
+     "s": [
+      "Passed",
+      5.01
+     ]
+    },
+    "ChunkPersistenceScenarios.ModifiedColumn_Should_SurviveUnloadReload_When_SavedBeforeUnload": {
+     "v": [
+      "Passed",
+      2.3
+     ],
+     "s": [
+      "Passed",
+      2.45
+     ]
+    },
+    "ChunkPersistenceScenarios.RepeatedCycles_Should_PersistEveryMutation_When_ColumnIsRecycled": {
+     "v": [
+      "Passed",
+      6.84
+     ],
+     "s": [
+      "Passed",
+      6.94
+     ]
+    },
+    "CommandParityScenarios.HomeCommands_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.StratumCommand_Should_ExistOnlyOnStratum_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "CommandParityScenarios.TimeAdd_Should_AdvanceCalendar_When_Executed": {
+     "v": [
+      "Passed",
+      0.04
+     ],
+     "s": [
+      "Passed",
+      0.04
+     ]
+    },
+    "CommandParityScenarios.UnknownCommand_Should_ReportSameErrorCode_When_Executed": {
+     "v": [
+      "Passed",
+      0.0
+     ],
+     "s": [
+      "Passed",
+      0.0
+     ]
+    },
+    "EntityTickingDisabledScenarios.FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig": {
+     "v": [
+      "Passed",
+      7.7
+     ],
+     "s": [
+      "Passed",
+      7.61
+     ]
+    },
+    "EntityTickingProbes.FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      7.63
+     ],
+     "s": [
+      "Passed",
+      7.61
+     ]
+    },
+    "RandomTickDisabledScenarios.FarPlatform_Should_Convert_When_LimitDisabledByConfig": {
+     "v": [
+      "Passed",
+      1.67
+     ],
+     "s": [
+      "Passed",
+      3.01
+     ]
+    },
+    "RandomTickProbes.FarPlatform_Should_ConvertOnVanillaAndStayUntouchedOnStratum_When_DefaultsActive": {
+     "v": [
+      "Passed",
+      1.21
+     ],
+     "s": [
+      "Passed",
+      16.65
+     ]
+    },
+    "SmokeParityScenarios.JoinedPlayer_Should_StayConnected_When_ServerTicks": {
+     "v": [
+      "Passed",
+      3.66
+     ],
+     "s": [
+      "Passed",
+      3.71
+     ]
+    },
+    "SmokeParityScenarios.Server_Should_BootAndAdvanceClock_When_Ticked": {
+     "v": [
+      "Passed",
+      1.0
+     ],
+     "s": [
+      "Passed",
+      1.01
+     ]
+    },
+    "SmokeParityScenarios.SetBlock_Should_ReadBackSameCode_When_Placed": {
+     "v": [
+      "Passed",
+      0.17
+     ],
+     "s": [
+      "Passed",
+      0.18
+     ]
+    },
+    "TickCostProbes.TickCost_NearBand": {
+     "v": [
+      "Passed",
+      51.63
+     ],
+     "s": [
+      "Passed",
+      53.19
+     ],
+     "metrics": {
+      "v": {
+       "ms_per_tick": 7.15,
+       "idle_ms_per_tick": 0.0,
+       "load_entities": 1000.0
+      },
+      "s": {
+       "ms_per_tick": 4.217,
+       "idle_ms_per_tick": 0.0,
+       "load_entities": 1000.0
+      },
+      "ratio": 0.59
+     }
+    }
+   },
+   "totals": {
+    "vanilla": {
+     "passed": 17,
+     "total": 17,
+     "duration": 98.7
+    },
+    "stratum": {
+     "passed": 17,
+     "total": 17,
+     "duration": 117.29
+    }
+   },
+   "parity": true
   }
  ]
 }
