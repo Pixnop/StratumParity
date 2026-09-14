@@ -9,7 +9,7 @@ set -euo pipefail
 # One build, two staged runs. `atlas stage` copies the target install's
 # VintagestoryAPI.dll+pdb into the built test output before each run, so the
 # fork's VintagestoryLib never runs against the vanilla API copy (that mix
-# fails at boot with MissingFieldException). Requires the Atlas CLI 0.11+:
+# fails at boot with MissingFieldException). Requires the Atlas CLI 0.13+:
 #   dotnet tool install -g Pixnop.Atlas.Cli
 
 if [[ $# -ne 2 ]]; then

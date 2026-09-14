@@ -15,7 +15,7 @@ on:
     - cron: '0 7 * * *'
 
 env:
-  VS_VERSION: '1.22.3'
+  VS_VERSION: '1.22.7'
 
 jobs:
   resolve:
@@ -138,7 +138,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install Atlas CLI
-        run: dotnet tool install -g Pixnop.Atlas.Cli --version 0.11.0
+        run: dotnet tool install -g Pixnop.Atlas.Cli --version 0.13.1
 
       - uses: actions/download-artifact@v4
         with:

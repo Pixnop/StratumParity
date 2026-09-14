@@ -10,8 +10,8 @@ on:
     - cron: '0 6 * * 1'
 
 env:
-  VS_VERSION: '1.22.3'
-  STRATUM_TAG: 'v1.22.3-stratum.15'
+  VS_VERSION: '1.22.7'
+  STRATUM_TAG: 'v1.22.7-stratum.2'
 
 jobs:
   parity:
@@ -124,7 +124,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install Atlas CLI
-        run: dotnet tool install -g Pixnop.Atlas.Cli --version 0.11.0
+        run: dotnet tool install -g Pixnop.Atlas.Cli --version 0.13.1
 
       - uses: actions/download-artifact@v4
         with:
