@@ -11,11 +11,11 @@
     --surface-1: #f6f6f4;
     --text-primary: #1a1a19;
     --text-secondary: #6b6a63;
-    --text-muted: #96958c;
+    --text-muted: #727168;
     --grid: #e7e6e1;
     --series-1: #2a78d6; /* vanilla */
-    --series-2: #1baf7a; /* stratum */
-    --status-good: #0ca30c;
+    --series-2: #1aa976; /* stratum */
+    --status-good: #0a8a0a;
     --status-critical: #d03b3b;
     --card: #ffffff;
     --border: #e4e3de;
@@ -28,7 +28,7 @@
       --surface-1: #161615;
       --text-primary: #f4f3ee;
       --text-secondary: #b9b8ae;
-      --text-muted: #85847b;
+      --text-muted: #87867d;
       --grid: #2f2e2b;
       --series-1: #3987e5;
       --series-2: #199e70;
@@ -91,6 +91,7 @@
   section { margin-top: 34px; }
   h2 { font-size: 16px; margin: 0 0 3px; letter-spacing: -.01em; }
   .caption { color: var(--text-secondary); font-size: 13px; margin: 0 0 12px; }
+  .error { color: var(--text-primary); border-left: 3px solid var(--status-critical); padding-left: 10px; font-size: 13px; margin: 8px 0; }
   .card {
     background: var(--card); border: 1px solid var(--border); border-radius: 12px;
     padding: 18px 18px 14px;
@@ -246,9 +247,9 @@
   </section>
 
   <footer>
-    <a href="https://github.com/Pixnop/StratumParity">Repository</a>
-    <a href="https://github.com/Pixnop/StratumParity/actions">CI runs</a>
-    <a href="https://github.com/Pixnop/StratumParity/actions/workflows/indev-scout.yml">Indev scout</a>
+    <a href="https://github.com/StratumServer/StratumParity">Repository</a>
+    <a href="https://github.com/StratumServer/StratumParity/actions">CI runs</a>
+    <a href="https://github.com/StratumServer/StratumParity/actions/workflows/indev-scout.yml">Indev scout</a>
     <a href="https://github.com/StratumServer/Stratum/issues/147">Stratum #147</a>
     <a href="https://github.com/Pixnop/Atlas">Built on Atlas</a>
   </footer>
@@ -257,26 +258,59 @@
 
 <script>
 (async function () {
-  // Two histories, one file per lane: runs.json is the pinned parity lane (feeds every
-  // chart below), scout.json is the daily indev lane (feeds only the Builds section and
-  // its tile, and does not exist until the first scout publish). The scout lane is
-  // optional by design, so ANY failure there (404, network, truncated body) degrades to
-  // an empty lane instead of taking the whole dashboard down with it.
-  const scoutsPromise = fetch('data/scout.json')
-    .then(resp => resp.ok ? resp.json() : { runs: [] })
-    .then(data => data.runs || [])
-    .catch(() => []);
-  const history = await (await fetch('data/runs.json')).json();
-  const runs = history.runs;
-  if (!runs.length) return;
-  const scouts = await scoutsPromise;
-  const latest = runs[runs.length - 1];
-  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const shortTag = tag => (tag || '?').replace(/^v[\d.]+-/, '');
   // Scout tags come from a third-party repo's release list; escape anything that reaches
   // innerHTML so a hostile tag name cannot inject markup into the dashboard.
   const esc = s => String(s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const showError = (el, message) => { el.innerHTML = `<p class="error">${esc(message)}</p>`; };
+
+  // GitHub Pages serves data/*.json through its CDN with Cache-Control: max-age=600.
+  // A plain fetch, even after a hard browser reload, can read a response cached from
+  // before the latest publish for up to ten minutes. `cache: 'no-store'` bypasses that:
+  // a run that just went green must not still read red.
+  async function fetchJSON(path) {
+    let resp;
+    try {
+      resp = await fetch(path, { cache: 'no-store' });
+    } catch {
+      throw new Error('network error');
+    }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    try {
+      return await resp.json();
+    } catch {
+      throw new Error('invalid JSON');
+    }
+  }
+
+  // Two histories, one file per lane: runs.json is the pinned parity lane (feeds every
+  // chart below), scout.json is the daily indev lane (feeds only the Builds section and
+  // its tile, and does not exist until the first scout publish). The scout lane is
+  // optional by design: a 404 there just means no scout run yet, not a failure. Any OTHER
+  // failure (network, non-404 non-ok, invalid JSON) is still surfaced in the Builds section,
+  // instead of silently looking identical to "no scout runs yet".
+  const scoutsPromise = fetchJSON('data/scout.json')
+    .then(data => ({ runs: data.runs || [] }))
+    .catch(err => err.message === 'HTTP 404' ? { runs: [] } : { runs: [], error: err.message });
+
+  const tilesEl = document.getElementById('tiles');
+  let history;
+  try {
+    history = await fetchJSON('data/runs.json');
+  } catch (err) {
+    showError(tilesEl, `Could not load data/runs.json (${err.message})`);
+    return;
+  }
+  const runs = history.runs || [];
+  if (!runs.length) {
+    showError(tilesEl, 'No runs recorded yet.');
+    return;
+  }
+  const scoutResult = await scoutsPromise;
+  const scouts = scoutResult.runs;
+  const latest = runs[runs.length - 1];
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const shortTag = tag => (tag || '?').replace(/^v[\d.]+-/, '');
 
   // Header badge
   const badge = document.getElementById('verdict-badge');
@@ -285,9 +319,12 @@
 
   // Stat tiles
   const greens = runs.filter(r => r.parity).length;
+  // "Scenario class" is the part of a scenario name before the dot, same split used for
+  // the Latest run table below: a stable, data-derived count instead of a hardcoded one.
+  const scenarioClasses = new Set(Object.keys(latest.scenarios).map(name => name.split('.')[0]));
   const tiles = [
     { k: 'Recorded runs', v: String(runs.length), d: `${greens} green · ${runs.length - greens} red` },
-    { k: 'Scenarios', v: String(Object.keys(latest.scenarios).length), d: 'six covered surfaces' },
+    { k: 'Scenarios', v: String(Object.keys(latest.scenarios).length), d: `${scenarioClasses.size} scenario classes` },
     { k: 'Vanilla suite', v: latest.totals.vanilla.duration.toFixed(0), vu: 's', d: `${latest.totals.vanilla.passed}/${latest.totals.vanilla.total} passed` },
     { k: 'Stratum suite', v: latest.totals.stratum.duration.toFixed(0), vu: 's', d: `${latest.totals.stratum.passed}/${latest.totals.stratum.total} passed` },
     { k: 'Pinned Stratum', v: shortTag(latest.stratum_tag), d: latest.date.slice(0, 10) + ' @ ' + latest.sha.slice(0, 7) },
@@ -299,12 +336,16 @@
       d: scout.date.slice(0, 10) + (scout.parity ? ' · ✓ parity' : ' · ✗ divergence'),
     });
   }
-  const tilesEl = document.getElementById('tiles');
   for (const t of tiles) {
     const div = document.createElement('div');
     div.className = 'tile';
     div.innerHTML = `<div class="k">${t.k}</div><div class="v${t.small ? ' sm' : ''}">${esc(t.v)}${t.vu ? `<small>${t.vu}</small>` : ''}</div><div class="d">${esc(t.d)}</div>`;
     tilesEl.appendChild(div);
+  }
+
+  if (scoutResult.error) {
+    document.getElementById('builds-table').closest('.card')
+      .insertAdjacentHTML('afterbegin', `<p class="error">Could not load data/scout.json (${esc(scoutResult.error)})</p>`);
   }
 
   // Builds table: one row per Stratum build ever tested, across both lanes, newest first.
@@ -331,7 +372,7 @@
       `<td class="num">${b.runs.length}${b.reds ? ` <span class="ko">(${b.reds} red)</span>` : ''}</td>` +
       `<td class="num">${t.vanilla.passed}/${t.vanilla.total} · ${t.stratum.passed}/${t.stratum.total}</td>` +
       `<td>${b.last.date.slice(0, 10)}</td>` +
-      `<td><a href="https://github.com/Pixnop/StratumParity/actions/runs/${b.last.run_id}">run</a></td>`;
+      `<td><a href="https://github.com/StratumServer/StratumParity/actions/runs/${b.last.run_id}">run</a></td>`;
     buildsBody.appendChild(tr);
   }
 
@@ -339,7 +380,7 @@
   const strip = document.getElementById('verdicts');
   for (const run of runs) {
     const a = document.createElement('a');
-    a.href = `https://github.com/Pixnop/StratumParity/actions/runs/${run.run_id}`;
+    a.href = `https://github.com/StratumServer/StratumParity/actions/runs/${run.run_id}`;
     a.style.background = run.parity ? css('--status-good') : css('--status-critical');
     a.textContent = run.parity ? '✓' : '✗';
     a.title = `${run.date.slice(0, 10)} @ ${run.sha}: ${run.parity ? 'parity holds' : 'divergence'}`;
