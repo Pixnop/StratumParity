@@ -21,7 +21,8 @@ public class EntityTickingDisabledScenarios : AtlasScenarioBase
     [AtlasScenario(TimeoutMs = 120_000)]
     public async Task FarEntity_Should_TickFullRate_When_EntityTickingDisabledByConfig()
     {
-        EntityTickingProbes.ProbePair pair = await EntityTickingProbes.SpawnProbePair(World);
+        EntityTickingProbes.ProbePair pair =
+            await EntityTickingProbes.SpawnProbePair(World, "tick-anchor", "game:strawdummy");
 
         int nearBefore = pair.Near.Ticks;
         int farBefore = pair.Far.Ticks;
