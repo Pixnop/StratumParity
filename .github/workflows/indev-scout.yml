@@ -27,7 +27,13 @@ jobs:
         id: pick
         run: |
           tag=$(curl -fsSL "https://api.github.com/repos/StratumServer/Stratum/releases?per_page=10" \
-            | python3 -c "import sys, json; releases = json.load(sys.stdin); print(next(r['tag_name'] for r in releases if r['prerelease']))")
+            | python3 -c "import sys, json; print(next((r['tag_name'] for r in json.load(sys.stdin) if r['prerelease']), ''))")
+          # Upstream may have no pre-release at all (right after a stable, or if they stop
+          # publishing them). Say so, instead of dying on a StopIteration traceback.
+          if [ -z "$tag" ]; then
+            echo "::error::no pre-release among the 10 most recent StratumServer/Stratum releases; nothing to scout"
+            exit 1
+          fi
           echo "latest pre-release: $tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
@@ -50,7 +56,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/install/${{ matrix.flavor }}
-          key: install-${{ matrix.flavor }}-${{ env.VS_VERSION }}-${{ needs.resolve.outputs.tag }}
+          # One ingredient per flavor, not both. The indev tag moves almost every day, so
+          # keying the vanilla install on it too meant re-downloading and re-extracting an
+          # unchanged vanilla server on nearly every scout run.
+          key: install-${{ matrix.flavor }}-${{ matrix.flavor == 'vanilla' && env.VS_VERSION || needs.resolve.outputs.tag }}
 
       - name: Install vanilla server
         if: matrix.flavor == 'vanilla' && steps.cache-install.outputs.cache-hit != 'true'
@@ -97,7 +106,9 @@ jobs:
             return "${PIPESTATUS[0]}"
           }
           if ! run_suite; then
-            # Same known-race retry as the Parity workflow (StratumServer/Stratum#151).
+            # Same known-race retry as the Parity workflow (StratumServer/Stratum#151),
+            # and the same caveat: the signature is literal engine and harness wording, so
+            # a fix upstream or a reworded message silently stops the retry from firing.
             if grep -qE "Collection was modified|SendServerAssets failed" test-output.log; then
               echo "::warning::known engine race (Stratum#151) killed the test host; retrying once"
               rm -rf results
@@ -152,6 +163,17 @@ jobs:
           SCOUT_TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           echo "# Indev scout: ${SCOUT_TAG}" >> "$GITHUB_STEP_SUMMARY"
+          # Check the inputs first: a leg that died before writing its report used to reach
+          # `atlas diff` anyway, and the `|| true` below turned that into an empty diff.json
+          # and a traceback three steps later. Name the file that is missing instead.
+          for trx in results/vanilla.trx results/stratum-indev.trx; do
+            if [ ! -s "$trx" ]; then
+              echo "::error::missing or empty TRX: ${trx} (that flavor's suite produced no report)"
+              exit 1
+            fi
+          done
+          # `|| true` stays: atlas diff exits non-zero on a candidate regression, which is
+          # not this step's verdict. The guard above is what catches a report that never came.
           atlas diff results/vanilla.trx results/stratum-indev.trx --json-tests > diff.json || true
           python3 scripts/render_summary.py diff.json >> "$GITHUB_STEP_SUMMARY"
 

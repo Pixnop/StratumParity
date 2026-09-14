@@ -32,7 +32,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/install/${{ matrix.flavor }}
-          key: install-${{ matrix.flavor }}-${{ env.VS_VERSION }}-${{ env.STRATUM_TAG }}
+          # One ingredient per flavor, not both: the vanilla install depends only on the
+          # game version, so folding STRATUM_TAG into its key threw a perfectly good cache
+          # away on every Stratum bump. The Stratum install is fully determined by its tag,
+          # which already carries the game version.
+          key: install-${{ matrix.flavor }}-${{ matrix.flavor == 'vanilla' && env.VS_VERSION || env.STRATUM_TAG }}
 
       - name: Install vanilla server
         if: matrix.flavor == 'vanilla' && steps.cache-install.outputs.cache-hit != 'true'
@@ -84,6 +88,9 @@ jobs:
             # as "SendServerAssets failed" and to the server log as "Collection was
             # modified". Retry once, but only on that exact signature so real regressions
             # keep failing loudly.
+            # That signature is literal engine and harness wording: a fix upstream, or a
+            # reworded message, silently stops the retry from firing (the run then just
+            # fails on the race). Re-read it before assuming the retry still does anything.
             if grep -qE "Collection was modified|SendServerAssets failed" test-output.log; then
               echo "::warning::known engine race (Stratum#151) killed the test host; retrying once"
               rm -rf results
@@ -137,6 +144,17 @@ jobs:
         # in the renderer because parity is symmetric: atlas diff's own exit code
         # only flags candidate regressions, a vanilla-only failure must fail too.
         run: |
+          # Check the inputs first: a leg that died before writing its report used to reach
+          # `atlas diff` anyway, and the `|| true` below turned that into an empty diff.json
+          # and a traceback three steps later. Name the file that is missing instead.
+          for trx in results/vanilla.trx results/stratum.trx; do
+            if [ ! -s "$trx" ]; then
+              echo "::error::missing or empty TRX: ${trx} (that flavor's suite produced no report)"
+              exit 1
+            fi
+          done
+          # `|| true` stays: atlas diff exits non-zero on a candidate regression, which is
+          # not this step's verdict. The guard above is what catches a report that never came.
           atlas diff results/vanilla.trx results/stratum.trx --json-tests > diff.json || true
           python3 scripts/render_summary.py diff.json >> "$GITHUB_STEP_SUMMARY"
 
