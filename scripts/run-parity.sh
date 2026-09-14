@@ -39,7 +39,8 @@ run_suite() {
   echo "== $label ($install) =="
   ( cd "$repo_root" \
     && VINTAGE_STORY="$install" atlas stage "$outdir" \
-    && VINTAGE_STORY="$install" dotnet test scenarios/StratumParity.Scenarios -c Release --no-build \
+    && VINTAGE_STORY="$install" PARITY_EXPECTED_FLAVOR="$label" \
+       dotnet test scenarios/StratumParity.Scenarios -c Release --no-build \
          --logger "trx;LogFileName=$label.trx" --results-directory "$results" )
 }
 

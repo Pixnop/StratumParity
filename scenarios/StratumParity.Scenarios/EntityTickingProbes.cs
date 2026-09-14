@@ -26,11 +26,18 @@ public class EntityTickingProbes : AtlasScenarioBase
 {
     private const int MeasurementTicks = 150;
     private const int StratumVeryFarInterval = 10;
+    // Every active raccoon AI task's movespeed is at or below the SkipMovingEntities
+    // threshold (0.01 blocks/tick; wander is 0.008), and its player-seeking tasks
+    // (meleeattack, seekentity, fleeentity) all need a player within 16 blocks, unreachable
+    // at the 200-block far position. See FarCreatureDriftBoundBlocks for the setup-failure
+    // guard that catches it if that assumption ever stops holding.
+    private const string FarCreatureCode = "game:raccoon-common-adult-male";
+    private const double FarCreatureDriftBoundBlocks = 2.0;
 
     [AtlasScenario(TimeoutMs = 120_000)]
     public async Task FarEntity_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive()
     {
-        ProbePair pair = await SpawnProbePair(World);
+        ProbePair pair = await SpawnProbePair(World, "tick-anchor", "game:strawdummy");
 
         int nearBefore = pair.Near.Ticks;
         int farBefore = pair.Far.Ticks;
@@ -62,18 +69,74 @@ public class EntityTickingProbes : AtlasScenarioBase
         }
     }
 
+    [AtlasScenario(TimeoutMs = 120_000)]
+    public async Task FarCreature_Should_TickFullRateOnVanillaAndThrottledOnStratum_When_DefaultsActive()
+    {
+        // ThrottleCreatures (default true) is never exercised by the dummy probe above: a
+        // straw dummy is inanimate, covered by ThrottleInanimate instead. SkipMovingEntities
+        // exempts entities moving above 0.01 blocks/tick, so a creature whose idle AI wanders
+        // would silently land on the unthrottled path; see FarCreatureCode's comment for why
+        // a raccoon does not.
+        ProbePair pair = await SpawnProbePair(World, "tick-anchor-2", FarCreatureCode);
+        EntityPos farPos = pair.FarEntity.Pos;
+        double farStartX = farPos.X, farStartY = farPos.Y, farStartZ = farPos.Z;
+
+        int nearBefore = pair.Near.Ticks;
+        int farBefore = pair.Far.Ticks;
+        long simBefore = World.EntitySimulationTicks;
+        await World.Ticks(MeasurementTicks);
+        long simDelta = World.EntitySimulationTicks - simBefore;
+        int nearDelta = pair.Near.Ticks - nearBefore;
+        int farDelta = pair.Far.Ticks - farBefore;
+
+        AssertAnchorStillNear(pair);
+        AssertFarCreatureStayedPut(farStartX, farStartY, farStartZ, farPos);
+        Assert.True(simDelta > 0, $"no entity-simulation ticks elapsed on {ServerFlavor.Name}");
+
+        Assert.True(nearDelta == simDelta,
+            $"near creature not exact on {ServerFlavor.Name}: {nearDelta} ticks vs {simDelta} sim ticks");
+
+        if (ServerFlavor.IsStratum)
+        {
+            long expected = simDelta / StratumVeryFarInterval;
+            Assert.True(Math.Abs(farDelta - expected) <= 2,
+                $"far creature off the 1-in-{StratumVeryFarInterval} stride on stratum: " +
+                $"{farDelta} ticks vs {expected} expected over {simDelta} sim ticks");
+        }
+        else
+        {
+            Assert.True(farDelta == simDelta,
+                $"far creature not exact on vanilla: {farDelta} ticks vs {simDelta} sim ticks");
+        }
+    }
+
+    /// <summary>Setup-failure guard for the far creature, same semantics as
+    /// <see cref="AssertAnchorStillNear"/>: idle AI wander pushing the creature's motion
+    /// above the SkipMovingEntities threshold would silently move it onto the unthrottled
+    /// path and invalidate the exact-count assertion above.</summary>
+    internal static void AssertFarCreatureStayedPut(double startX, double startY, double startZ, EntityPos pos)
+    {
+        double dx = pos.X - startX;
+        double dy = pos.Y - startY;
+        double dz = pos.Z - startZ;
+        double distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        Assert.True(distance < FarCreatureDriftBoundBlocks,
+            $"far creature drifted {distance:F3} blocks over the measurement window on {ServerFlavor.Name}; setup is invalid");
+    }
+
     internal sealed record ProbePair(
-        ITestPlayer Anchor, BlockPos NearPos, TickCounterBehavior Near, TickCounterBehavior Far);
+        ITestPlayer Anchor, BlockPos NearPos, TickCounterBehavior Near, TickCounterBehavior Far, Entity FarEntity);
 
     /// <summary>
     /// Shared setup: a Playing anchor player teleported to a fixed position, one counted
-    /// stationary dummy 8 blocks from it (near band with drift margin), one 200 blocks out
-    /// in a kept-loaded column, both settled to rest before measuring (Stratum does not
-    /// throttle moving entities).
+    /// entity 8 blocks from it (near band with drift margin), one 200 blocks out in a
+    /// kept-loaded column, both settled to rest before measuring (Stratum does not throttle
+    /// moving entities). The anchor name must be unique per scenario: test players are
+    /// joined into the class's shared world and persist across scenarios in the class.
     /// </summary>
-    internal static async Task<ProbePair> SpawnProbePair(IWorldSession world)
+    internal static async Task<ProbePair> SpawnProbePair(IWorldSession world, string anchorName, string entityCode)
     {
-        ITestPlayer anchor = await world.JoinPlayer("tick-anchor");
+        ITestPlayer anchor = await world.JoinPlayer(anchorName);
         await world.Ticks(2);
         // Pin the anchor: the join scatters players around spawn, and every distance band
         // is measured from the nearest Playing client. Read the position only after the
@@ -94,11 +157,11 @@ public class EntityTickingProbes : AtlasScenarioBase
             () => world.Api.World.BlockAccessor.GetChunkAtBlockPos(farPos) != null,
             timeoutTicks: 600);
 
-        TickCounterBehavior near = SpawnCountedDummy(world, nearPos);
-        TickCounterBehavior far = SpawnCountedDummy(world, farPos);
+        (TickCounterBehavior Counter, Entity Entity) near = SpawnCountedDummy(world, nearPos, entityCode);
+        (TickCounterBehavior Counter, Entity Entity) far = SpawnCountedDummy(world, farPos, entityCode);
 
         await world.Ticks(60);
-        return new ProbePair(anchor, nearPos, near, far);
+        return new ProbePair(anchor, nearPos, near.Counter, far.Counter, far.Entity);
     }
 
     /// <summary>End-of-window guard, setup-failure semantics: if the anchor drifted toward
@@ -114,15 +177,13 @@ public class EntityTickingProbes : AtlasScenarioBase
             $"anchor drifted to {distance:F1} blocks from the near dummy (band boundary is 32); setup is invalid");
     }
 
-    private static TickCounterBehavior SpawnCountedDummy(IWorldSession world, BlockPos pos)
+    private static (TickCounterBehavior Counter, Entity Entity) SpawnCountedDummy(
+        IWorldSession world, BlockPos pos, string entityCode)
     {
-        // A straw dummy stands perfectly still. That matters: Stratum exempts moving
-        // entities from throttling (SkipMovingEntities, threshold 0.01 blocks/tick), and
-        // even a dropped item keeps enough residual motion to stay exempt forever.
-        Entity dummy = world.SpawnEntity("game:strawdummy", pos);
+        Entity entity = world.SpawnEntity(entityCode, pos);
 
-        var counter = new TickCounterBehavior(dummy);
-        dummy.SidedProperties.Behaviors.Add(counter);
-        return counter;
+        var counter = new TickCounterBehavior(entity);
+        entity.SidedProperties.Behaviors.Add(counter);
+        return (counter, entity);
     }
 }

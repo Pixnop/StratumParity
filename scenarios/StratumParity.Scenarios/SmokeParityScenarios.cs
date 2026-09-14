@@ -2,6 +2,7 @@ using Atlas.Api;
 using Atlas.XUnit;
 using Vintagestory.API.MathTools;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace StratumParity.Scenarios;
 
@@ -12,6 +13,33 @@ namespace StratumParity.Scenarios;
 /// </summary>
 public class SmokeParityScenarios : AtlasScenarioBase
 {
+    private readonly ITestOutputHelper output;
+
+    public SmokeParityScenarios(ITestOutputHelper output) => this.output = output;
+
+    [AtlasScenario]
+    public Task LoadedServer_Should_MatchExpectedFlavor_When_CiArmsTheGuard()
+    {
+        // Catches a misconfigured CI leg that ran the wrong install under a flavor's label:
+        // without this, every differential scenario would read ServerFlavor.IsStratum,
+        // silently pick the vanilla expectations, and the suite would report parity between
+        // vanilla and vanilla. Unset (a developer running `dotnet test` by hand) is not
+        // armed, so it passes and just says so.
+        string? expected = Environment.GetEnvironmentVariable("PARITY_EXPECTED_FLAVOR");
+        if (string.IsNullOrEmpty(expected))
+        {
+            output.WriteLine("PARITY_EXPECTED_FLAVOR not set; flavor guard not armed.");
+            return Task.CompletedTask;
+        }
+
+        // StartsWith, not an exact match: the indev scout workflow labels its Stratum leg
+        // "stratum-indev", not "stratum".
+        bool expectStratum = expected.StartsWith("stratum", StringComparison.OrdinalIgnoreCase);
+        Assert.True(expectStratum == ServerFlavor.IsStratum,
+            $"CI expected flavor '{expected}' but the loaded server reports {ServerFlavor.Name}");
+        return Task.CompletedTask;
+    }
+
     [AtlasScenario]
     public async Task Server_Should_BootAndAdvanceClock_When_Ticked()
     {

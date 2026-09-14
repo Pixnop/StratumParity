@@ -71,6 +71,61 @@ public class ChunkPersistenceScenarios : AtlasScenarioBase
         }
     }
 
+    [AtlasScenario(TimeoutMs = 120_000)]
+    public async Task LightLevels_Should_SurviveUnloadReload_When_TorchIsLit()
+    {
+        // Stratum rewrote the chunk data layer (bit planes, AVX decode) but nothing rereads
+        // light, so a light byte surviving that round trip is untested by the block/moddata
+        // assertions above.
+        const string TorchCode = "game:torch-basic-lit-up";
+        BlockPos anchor = World.Spawn.AddCopy(200, 1, 200);
+        await LoadColumn(anchor);
+
+        BlockPos torchPos = anchor.AddCopy(4, 2, 4);
+        World.SetBlock(TorchCode, torchPos);
+        Assert.Equal(TorchCode, World.BlockAt(torchPos).Code.ToString());
+        // SaveUnloadReload's own reload wait is gated on moddata being readable again (see
+        // its comment): without any, the predicate can never turn true.
+        SetColumnModdata(anchor, new byte[] { 0x4C });
+
+        // Let the light flood-fill settle before the first reading.
+        await World.Ticks(30);
+
+        BlockPos[] samples =
+        {
+            torchPos,
+            torchPos.AddCopy(1, 0, 0),
+            torchPos.AddCopy(-1, 0, 0),
+            torchPos.AddCopy(0, 0, 1),
+            torchPos.AddCopy(0, 1, 0),
+            anchor.AddCopy(-4, 2, -4), // far from the torch, same column
+        };
+        (int Sun, int Block)[] before = ReadLightLevels(samples);
+
+        await SaveUnloadReload(anchor);
+
+        (int Sun, int Block)[] after = ReadLightLevels(samples);
+        for (int i = 0; i < samples.Length; i++)
+        {
+            Assert.True(before[i].Sun == after[i].Sun,
+                $"sunlight at sample {i} changed after reload on {ServerFlavor.Name}: {before[i].Sun} -> {after[i].Sun}");
+            Assert.True(before[i].Block == after[i].Block,
+                $"block light at sample {i} changed after reload on {ServerFlavor.Name}: {before[i].Block} -> {after[i].Block}");
+        }
+    }
+
+    private (int Sun, int Block)[] ReadLightLevels(BlockPos[] positions)
+    {
+        var readings = new (int Sun, int Block)[positions.Length];
+        for (int i = 0; i < positions.Length; i++)
+        {
+            readings[i] = (
+                World.Api.World.BlockAccessor.GetLightLevel(positions[i], EnumLightLevelType.OnlySunLight),
+                World.Api.World.BlockAccessor.GetLightLevel(positions[i], EnumLightLevelType.OnlyBlockLight));
+        }
+        return readings;
+    }
+
     private async Task LoadColumn(BlockPos anchor)
     {
         World.Api.WorldManager.LoadChunkColumnPriority(anchor.X / 32, anchor.Z / 32);

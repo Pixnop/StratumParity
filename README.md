@@ -23,7 +23,7 @@ a Stratum install, and the results must line up. Scenarios fall into two familie
 
 ## Coverage
 
-Seventeen scenarios in ten classes: parity scenarios, probes, and one informational perf
+Twenty scenarios in ten classes: parity scenarios, probes, and one informational perf
 measurement, green on both flavors against the pinned pair, re-run by CI on every PR and
 weekly against the pinned Stratum release. A separate daily **indev scout**
 workflow resolves the latest Stratum pre-release and runs the same suite against it:
@@ -32,11 +32,11 @@ history and shown in the dashboard's Builds section, never mixed into the stable
 
 | Surface | Scenarios | What is pinned down |
 |---|---|---|
-| Boot, block placement, join | `SmokeParityScenarios` | Fundamentals identical on both flavors; a joined player survives Stratum's packet limiter |
-| Entity tick throttling | `EntityTickingProbes`, `EntityTickingDisabledScenarios` | Exact counts against the engine entity-simulation tick counter: near entities tick once per sim tick on both flavors, entities in Stratum's very-far band (beyond 96 blocks; the probe puts one 200 blocks out) exactly 1 in 10 on Stratum and once per sim tick on vanilla; the mid (1 in 2) and far (1 in 5) bands are not probed; `EntityTicking.Enabled: false` restores exact parity |
+| Boot, block placement, join | `SmokeParityScenarios` | Fundamentals identical on both flavors; a joined player survives Stratum's packet limiter; the CI leg's expected flavor is asserted against the loaded server (the flavor guard, `PARITY_EXPECTED_FLAVOR`) |
+| Entity tick throttling | `EntityTickingProbes`, `EntityTickingDisabledScenarios` | Exact counts against the engine entity-simulation tick counter: near entities tick once per sim tick on both flavors, entities in Stratum's very-far band (beyond 96 blocks; the probe puts one 200 blocks out) exactly 1 in 10 on Stratum and once per sim tick on vanilla; the mid (1 in 2) and far (1 in 5) bands are not probed; `EntityTicking.Enabled: false` restores exact parity; the probes are run with both a straw dummy and an AI creature (a raccoon) that stays put |
 | Command surface | `CommandParityScenarios` | Vanilla commands behave identically (incl. unknown-command error codes); `/stratum` and `/sethome` exist on Stratum only |
 | Block tick listeners | `BlockTickListenerProbes`, `BlockTickListenerDisabledScenarios` | Far listeners are skipped entirely on Stratum (128-block radius), force-loaded columns stay exempt, toggle restores parity |
-| Chunk persistence | `ChunkPersistenceScenarios` | Blocks + chunk moddata survive save/unload/reload cycles identically through Stratum's incremental autosave (its opt-in pooled chunk reads are off by default and not exercised here) |
+| Chunk persistence | `ChunkPersistenceScenarios` | Blocks + chunk moddata survive save/unload/reload cycles identically through Stratum's incremental autosave (its opt-in pooled chunk reads are off by default and not exercised here); sunlight and block light around a torch are re-read after the reload |
 | Random ticks | `RandomTickProbes`, `RandomTickDisabledScenarios` | Vanilla gates random ticks to 5 chunks around Playing clients; Stratum clamps to 3; probed at chunk distance 4 via a staged source mod whose block converts on every random tick |
 | Tick cost (perf) | `TickCostProbes` | Server work-ms per tick under a fixed active-entity load, emitted to the dashboard as a trend; informational, not a pass/fail gate (see below) |
 
