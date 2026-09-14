@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Differential parity dashboard: vanilla Vintage Story vs Stratum, run history and duration trends.">
+<meta name="description" content="Differential parity dashboard: vanilla Vintage Story vs Stratum, today's verdict per lane, failure causes, run history and duration trends.">
 <title>StratumParity dashboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
 <style>
@@ -15,12 +15,19 @@
     --grid: #e7e6e1;
     --series-1: #2a78d6; /* vanilla */
     --series-2: #1aa976; /* stratum */
-    --status-good: #0a8a0a;
-    --status-critical: #d03b3b;
+    /* Two roles, two variables. A single green cannot be both a badge fill under white
+       text and a label colour on the card: on the dark theme those pull in opposite
+       directions, and the shared value used to fail one of them. Every pair below is
+       checked at 4.5:1 in both themes. */
+    --status-good-bg: #0d7a0d;    /* white text on it */
+    --status-good-text: #0b6b0b;  /* on --card */
+    --status-critical-bg: #c02626;
+    --status-critical-text: #b82525;
+    --link: #1560bd;              /* link text; --series-1 stays the chart's line colour */
     --card: #ffffff;
     --border: #e4e3de;
     --accent-soft: #eef4fc;
-    --indev: #b45309;
+    --indev: #9a4708;
     --indev-soft: #fbf0e0;
   }
   @media (prefers-color-scheme: dark) {
@@ -32,6 +39,11 @@
       --grid: #2f2e2b;
       --series-1: #3987e5;
       --series-2: #199e70;
+      --status-good-bg: #157a26;
+      --status-good-text: #5fd08a;
+      --status-critical-bg: #c02f2f;
+      --status-critical-text: #ef8a84;
+      --link: #79b6f7;
       --card: #1f1f1d;
       --border: #34332f;
       --accent-soft: #22293357;
@@ -47,6 +59,11 @@
     -webkit-font-smoothing: antialiased;
   }
   .wrap { max-width: 1020px; margin: 0 auto; padding: 36px 24px 56px; }
+  :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 3px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
 
   /* Header */
   header { margin-bottom: 26px; }
@@ -61,41 +78,65 @@
     display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 999px;
     font-weight: 700; font-size: 13px; color: #fff; letter-spacing: 0; vertical-align: middle;
   }
-  .badge.good { background: var(--status-good); }
-  .badge.critical { background: var(--status-critical); }
-
-  /* Stat tiles */
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 22px 0 6px; }
-  .tile {
-    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px 16px 12px;
-  }
-  .tile .k {
-    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-    color: var(--text-muted); margin-bottom: 4px;
-  }
-  .tile .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-  .tile .v.sm { font-size: 16px; line-height: 2.1; }
-  .tile .v small { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-left: 2px; }
-  .tile .d { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .badge.good { background: var(--status-good-bg); }
+  .badge.critical { background: var(--status-critical-bg); }
 
   /* Build channel pills */
   .chan {
     display: inline-block; padding: 2px 9px; border-radius: 999px;
     font-size: 11px; font-weight: 700; letter-spacing: .04em;
   }
-  .chan.pinned { background: var(--accent-soft); color: var(--series-1); }
+  .chan.pinned { background: var(--accent-soft); color: var(--link); }
   .chan.indev { background: var(--indev-soft); color: var(--indev); }
 
   /* Sections and cards */
   section { margin-top: 34px; }
   h2 { font-size: 16px; margin: 0 0 3px; letter-spacing: -.01em; }
-  .caption { color: var(--text-secondary); font-size: 13px; margin: 0 0 12px; }
-  .error { color: var(--text-primary); border-left: 3px solid var(--status-critical); padding-left: 10px; font-size: 13px; margin: 8px 0; }
+  .caption { color: var(--text-secondary); font-size: 13px; margin: 0 0 12px; max-width: 80ch; }
+  .error {
+    color: var(--text-primary); border-left: 3px solid var(--status-critical-bg);
+    padding-left: 10px; font-size: 13px; margin: 8px 0; overflow-wrap: anywhere;
+  }
   .card {
     background: var(--card); border: 1px solid var(--border); border-radius: 12px;
     padding: 18px 18px 14px;
   }
+
+  /* Today: one card per lane */
+  .lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 14px; }
+  .lane {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 15px 18px 15px;
+  }
+  .lane-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .lane-tag {
+    font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+    font-size: 18px; font-weight: 700; letter-spacing: -.01em; margin: 9px 0 2px;
+    overflow-wrap: anywhere;
+  }
+  .meta {
+    margin: 9px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px;
+    font-size: 13px; align-items: baseline;
+  }
+  .meta dt {
+    color: var(--text-muted); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em; white-space: nowrap;
+  }
+  .meta dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .meta .soft { color: var(--text-secondary); }
+
+  /* Failure causes, shared by the lane cards and the two tables */
+  .causes { margin-top: 13px; border-top: 1px solid var(--border); padding-top: 11px; }
+  .causes-h {
+    margin: 0 0 7px; font-size: 11px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--status-critical-text);
+  }
+  .causes ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+  .causes li { border-left: 3px solid var(--status-critical-bg); padding-left: 9px; }
+  .causes li.more { border-left-color: var(--border); color: var(--text-secondary); font-size: 12px; }
+  .cause { display: block; color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+  .cls { color: var(--text-muted); font-size: 12px; display: block; overflow-wrap: anywhere; }
+  .mth { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
 
   /* Legend + controls */
   .controls { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -105,15 +146,21 @@
     background: var(--card); color: var(--text-primary); border: 1px solid var(--border);
     border-radius: 8px; padding: 6px 10px; font-size: 13px; max-width: 100%;
   }
-  select:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
   svg.chart { display: block; width: 100%; height: auto; }
+  .chart-summary {
+    color: var(--text-secondary); font-size: 12px; margin: 6px 2px 0;
+    font-variant-numeric: tabular-nums;
+  }
 
   /* Tooltip */
   .tooltip {
     position: fixed; pointer-events: none; background: var(--card); color: var(--text-primary);
     border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.18); display: none; z-index: 10; white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18); display: none; z-index: 10;
     font-variant-numeric: tabular-nums;
+    /* A Stratum tag comes from a third-party release list and has no length bound, so the
+       tooltip wraps and stays inside the viewport instead of running off its right edge. */
+    max-width: calc(100vw - 16px); white-space: normal; overflow-wrap: anywhere;
   }
   .tooltip b { font-size: 12px; }
   .tooltip .row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
@@ -128,20 +175,21 @@
   }
   .verdicts a:hover { transform: scale(1.18); }
 
-  /* Table */
-  .tablewrap { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  /* Anything wider than its card scrolls inside the card, never the page */
+  .scrollx { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 13px; }
   th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--border); }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover td { background: var(--accent-soft); }
   th { color: var(--text-muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td a { color: var(--series-1); font-weight: 600; text-decoration: none; }
+  td a { color: var(--link); font-weight: 600; text-decoration: none; }
   td a:hover { text-decoration: underline; }
-  .scen .cls { color: var(--text-muted); font-size: 12px; display: block; }
-  .scen .mth { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 12px; }
-  .ok { color: var(--status-good); font-weight: 700; white-space: nowrap; }
-  .ko { color: var(--status-critical); font-weight: 700; white-space: nowrap; }
+  tr.has-cause td { border-bottom: none; padding-bottom: 2px; }
+  tr.cause-row td { padding-top: 0; }
+  tr.cause-row .cause { border-left: 3px solid var(--status-critical-bg); padding-left: 9px; }
+  .ok { color: var(--status-good-text); font-weight: 700; white-space: nowrap; }
+  .ko { color: var(--status-critical-text); font-weight: 700; white-space: nowrap; }
 
   .foot { color: var(--text-muted); font-size: 12px; margin: 10px 2px 0; }
   footer {
@@ -149,6 +197,16 @@
     color: var(--text-muted); font-size: 12px; display: flex; gap: 18px; flex-wrap: wrap;
   }
   footer a { color: var(--text-secondary); }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 26px 14px 40px; }
+    h1 { font-size: 22px; }
+    .lanes { grid-template-columns: 1fr; }
+    /* Chart text is sized for 960 user units. Scaling the chart down to a phone shrinks
+       the axis labels with it, so below this width the chart keeps its native size and
+       scrolls inside its card like the tables do. */
+    svg.chart { min-width: 960px; }
+  }
 </style>
 </head>
 <body>
@@ -159,8 +217,16 @@
     <p class="sub">The same gameplay scenarios run against a vanilla server and a
       <a href="https://github.com/StratumServer/Stratum">Stratum</a> server; outcomes must line up.
       History below is appended by CI on every main-branch run.</p>
-    <div class="tiles" id="tiles"></div>
   </header>
+
+  <main>
+  <section id="today-section">
+    <h2>Where each lane stands</h2>
+    <p class="caption">The most recent run of each lane, what it tested, and, when the verdict is a
+      divergence, which scenarios disagreed and what they reported.</p>
+    <div class="lanes" id="today"></div>
+    <p class="foot" id="corpus"></p>
+  </section>
 
   <section>
     <h2>Builds</h2>
@@ -168,7 +234,7 @@
       parity lane, and pre-releases from the daily indev scout (non-gating, kept out of the
       trend charts). Verdict is the build's most recent run; the CI link opens it.</p>
     <div class="card">
-      <div class="tablewrap">
+      <div class="scrollx">
       <table id="builds-table">
         <thead><tr><th>Build</th><th>Channel</th><th>Latest verdict</th><th class="num">Runs</th><th class="num">Scenarios v · s</th><th>Last tested</th><th>CI</th></tr></thead>
         <tbody></tbody>
@@ -177,13 +243,13 @@
     </div>
   </section>
 
-  <section>
+  <section data-needs="pinned">
     <h2>Run verdicts</h2>
     <p class="caption">One tile per recorded run on the pinned lane: ✓ parity holds, ✗ outcome divergence. Click opens the CI run.</p>
     <div class="card"><div class="verdicts" id="verdicts"></div></div>
   </section>
 
-  <section>
+  <section data-needs="pinned">
     <h2>Total suite duration</h2>
     <p class="caption">Wall time of the full suite per flavor, across runs. Seconds.</p>
     <div class="card">
@@ -193,11 +259,16 @@
           <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
         </div>
       </div>
-      <svg id="chart-total" class="chart" viewBox="0 0 960 270" role="img" aria-label="Total suite duration per flavor across runs"></svg>
+      <div class="scrollx">
+        <svg id="chart-total" class="chart" viewBox="0 0 960 270" role="img" tabindex="0"
+             aria-label="Total suite duration per flavor across runs. Focus this chart and use the arrow keys to read run by run."
+             aria-describedby="summary-total"></svg>
+      </div>
+      <p class="chart-summary" id="summary-total"></p>
     </div>
   </section>
 
-  <section>
+  <section data-needs="pinned">
     <h2>Per-scenario duration</h2>
     <p class="caption">Pick a scenario to follow its duration on both flavors across runs. Seconds.</p>
     <div class="card">
@@ -208,11 +279,16 @@
           <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
         </div>
       </div>
-      <svg id="chart-scenario" class="chart" viewBox="0 0 960 270" role="img" aria-label="Per-scenario duration across runs"></svg>
+      <div class="scrollx">
+        <svg id="chart-scenario" class="chart" viewBox="0 0 960 270" role="img" tabindex="0"
+             aria-label="Per-scenario duration across runs. Focus this chart and use the arrow keys to read run by run."
+             aria-describedby="summary-scenario"></svg>
+      </div>
+      <p class="chart-summary" id="summary-scenario"></p>
     </div>
   </section>
 
-  <section id="perf-section" hidden>
+  <section id="perf-section" data-needs="pinned" hidden>
     <h2>Tick cost</h2>
     <p class="caption">Server work time per tick under a fixed straw-dummy load, ms/tick. Informational:
       vanilla and Stratum run on different CI machines, so read each trend on its own, not the gap.
@@ -226,15 +302,20 @@
           <span><span class="sw" style="background:var(--series-2)"></span>stratum</span>
         </div>
       </div>
-      <svg id="chart-perf" class="chart" viewBox="0 0 960 270" role="img" aria-label="Per-scenario tick cost across runs"></svg>
+      <div class="scrollx">
+        <svg id="chart-perf" class="chart" viewBox="0 0 960 270" role="img" tabindex="0"
+             aria-label="Per-scenario tick cost across runs. Focus this chart and use the arrow keys to read run by run."
+             aria-describedby="summary-perf"></svg>
+      </div>
+      <p class="chart-summary" id="summary-perf"></p>
     </div>
   </section>
 
-  <section>
+  <section data-needs="pinned">
     <h2>Latest run</h2>
     <p class="caption" id="latest-caption"></p>
     <div class="card">
-      <div class="tablewrap">
+      <div class="scrollx">
       <table id="latest-table">
         <thead><tr><th>Scenario</th><th>Vanilla</th><th class="num">s</th><th>Stratum</th><th class="num">s</th><th class="num">Δ s</th></tr></thead>
         <tbody></tbody>
@@ -245,6 +326,7 @@
       expectedly run longer there.</p>
     </div>
   </section>
+  </main>
 
   <footer>
     <a href="https://github.com/StratumServer/StratumParity">Repository</a>
@@ -255,14 +337,19 @@
   </footer>
 </div>
 <div class="tooltip" id="tooltip"></div>
+<div class="sr-only" id="chart-live" role="status" aria-live="polite"></div>
 
 <script>
 (async function () {
+  const PARITY_REPO = 'https://github.com/StratumServer/StratumParity';
+  const STRATUM_REPO = 'https://github.com/StratumServer/Stratum';
+  // How many diverging scenarios a lane card lists before it starts counting the rest.
+  const MAX_CAUSES = 5;
+
   // Scout tags come from a third-party repo's release list; escape anything that reaches
   // innerHTML so a hostile tag name cannot inject markup into the dashboard.
   const esc = s => String(s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const showError = (el, message) => { el.innerHTML = `<p class="error">${esc(message)}</p>`; };
 
   // GitHub Pages serves data/*.json through its CDN with Cache-Control: max-age=600.
   // A plain fetch, even after a hard browser reload, can read a response cached from
@@ -283,73 +370,209 @@
     }
   }
 
-  // Two histories, one file per lane: runs.json is the pinned parity lane (feeds every
-  // chart below), scout.json is the daily indev lane (feeds only the Builds section and
-  // its tile, and does not exist until the first scout publish). The scout lane is
-  // optional by design: a 404 there just means no scout run yet, not a failure. Any OTHER
-  // failure (network, non-404 non-ok, invalid JSON) is still surfaced in the Builds section,
-  // instead of silently looking identical to "no scout runs yet".
-  const scoutsPromise = fetchJSON('data/scout.json')
-    .then(data => ({ runs: data.runs || [] }))
-    .catch(err => err.message === 'HTTP 404' ? { runs: [] } : { runs: [], error: err.message });
+  // Recorded dates mix UTC and +02:00 offsets, so every date on the page is parsed and
+  // re-rendered in UTC instead of being sliced out of the raw string: two runs an hour
+  // apart must not read as two different days because one was stamped in Paris time.
+  const parseDate = iso => { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t) : null; };
+  const fmtDate = iso => { const d = parseDate(iso); return d ? d.toISOString().slice(0, 10) : String(iso); };
+  const fmtDateTime = iso => {
+    const d = parseDate(iso);
+    return d ? d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : String(iso);
+  };
+  const fmtDayMonth = iso => { const d = parseDate(iso); return d ? d.toISOString().slice(5, 10) : String(iso); };
+  function ago(iso) {
+    const d = parseDate(iso);
+    if (!d) return '';
+    const day = ms => Math.floor(ms / 86400000);
+    const days = day(Date.now()) - day(d.getTime());
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    return `${days} days ago`;
+  }
 
-  const tilesEl = document.getElementById('tiles');
-  let history;
-  try {
-    history = await fetchJSON('data/runs.json');
-  } catch (err) {
-    showError(tilesEl, `Could not load data/runs.json (${err.message})`);
-    return;
-  }
-  const runs = history.runs || [];
-  if (!runs.length) {
-    showError(tilesEl, 'No runs recorded yet.');
-    return;
-  }
-  const scoutResult = await scoutsPromise;
-  const scouts = scoutResult.runs;
-  const latest = runs[runs.length - 1];
-  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const shortTag = tag => (tag || '?').replace(/^v[\d.]+-/, '');
+  // Scenario keys are "<class>.<method>"; the method itself can carry dots, so split on
+  // the first one only instead of taking the first two segments.
+  const splitName = name => {
+    const i = String(name).indexOf('.');
+    return i < 0 ? ['', String(name)] : [String(name).slice(0, i), String(name).slice(i + 1)];
+  };
+  const ciLink = (runId, text) =>
+    `<a href="${PARITY_REPO}/actions/runs/${encodeURIComponent(runId)}">${esc(text || runId)}</a>`;
+  // `sha` is a StratumParity commit, `stratum_sha` a StratumServer/Stratum one: two
+  // repositories, two links, never interchangeable.
+  const parityCommitLink = sha =>
+    `<a href="${PARITY_REPO}/commit/${encodeURIComponent(sha)}" title="StratumParity commit ${esc(sha)}">${esc(String(sha).slice(0, 7))}</a>`;
+  const stratumCommitLink = sha =>
+    `<a href="${STRATUM_REPO}/commit/${encodeURIComponent(sha)}" title="Stratum commit ${esc(sha)}">${esc(String(sha).slice(0, 7))}</a>`;
+
+  // A scenario diverges when one flavor is missing it or the two outcomes differ; that is
+  // the same rule the history writer uses to set `parity`.
+  const diverges = e => !e.v || !e.s || e.v[0] !== e.s[0];
+  const divergences = run => Object.entries(run.scenarios || {}).filter(([, e]) => diverges(e));
+  const scenarioCount = run => Object.keys(run.scenarios || {}).length;
+  // The producer computes parity as all() over the scenarios, and all([]) is true, so a
+  // run whose suite never produced a single result is recorded as green. It is not: it
+  // proved nothing. Every verdict on the page goes through here.
+  const holds = run => run.parity && scenarioCount(run) > 0;
+  const verdictText = run => holds(run) ? 'parity holds'
+    : scenarioCount(run) ? 'divergence' : 'no results recorded';
+  const verdictHtml = run => holds(run)
+    ? `<span class="ok">✓ ${verdictText(run)}</span>`
+    : `<span class="ko">✗ ${verdictText(run)}</span>`;
+
+  // Why a scenario is red, per failing flavor. Runs recorded before schema 3 carry no
+  // `error` key, so they degrade to the bare outcome, which is what they used to show.
+  function causeText(entry) {
+    const parts = [];
+    for (const [side, label] of [['v', 'vanilla'], ['s', 'stratum']]) {
+      const outcome = entry[side];
+      if (!outcome) { parts.push(`${label}: no result recorded`); continue; }
+      if (outcome[0] === 'Passed') continue;
+      const message = entry.error && entry.error[side];
+      parts.push(`${label} ${String(outcome[0]).toLowerCase()}${message ? `: ${message}` : ''}`);
+    }
+    if (!parts.length) {
+      parts.push(`vanilla ${entry.v[0]} · stratum ${entry.s[0]}`);
+    }
+    return parts.join(' · ');
+  }
+  // Rendered in full, not clipped with the rest hidden in a title attribute: the producer
+  // already caps a message at 400 characters, and a title is reachable by neither the
+  // keyboard nor most screen readers.
+  const causeSpan = entry => `<span class="cause">${esc(causeText(entry))}</span>`;
+
+  function causesHtml(run) {
+    const bad = divergences(run);
+    if (!bad.length) return '';
+    const items = bad.slice(0, MAX_CAUSES).map(([name, entry]) => {
+      const [cls, mth] = splitName(name);
+      return `<li><span class="cls">${esc(cls)}</span><span class="mth">${esc(mth)}</span>${causeSpan(entry)}</li>`;
+    });
+    if (bad.length > items.length) {
+      items.push(`<li class="more">+${bad.length - items.length} more diverging scenario(s)</li>`);
+    }
+    const plural = bad.length > 1 ? 'scenarios diverge' : 'scenario diverges';
+    return `<div class="causes"><p class="causes-h">${bad.length} ${plural}</p><ul>${items.join('')}</ul></div>`;
+  }
+
+  const todayEl = document.getElementById('today');
+
+  // Two histories, one file per lane: runs.json is the pinned parity lane (it also feeds
+  // every chart below), scout.json is the daily indev lane, which does not exist until the
+  // first scout publish. They are fetched side by side and neither can blank the other: a
+  // lane that failed to load says so on its own card, the other lane still renders, and
+  // the Builds table is built from whatever did load. A 404 on scout.json is the normal
+  // "no scout run yet" state rather than a failure; any other error is reported as one.
+  const load = (path, missingIsEmpty) => fetchJSON(path)
+    .then(data => ({ runs: data.runs || [] }))
+    .catch(err => missingIsEmpty && err.message === 'HTTP 404'
+      ? { runs: [] } : { runs: [], error: err.message });
+  const scoutsPromise = load('data/scout.json', true);
+  const runsPromise = load('data/runs.json', false);
+
+  const runsResult = await runsPromise;
+  const scoutResult = await scoutsPromise;
+  const runs = runsResult.runs;
+  const scouts = scoutResult.runs;
+  const latest = runs[runs.length - 1] || null;
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
   // Header badge
-  const badge = document.getElementById('verdict-badge');
-  badge.className = 'badge ' + (latest.parity ? 'good' : 'critical');
-  badge.textContent = latest.parity ? '✓ parity holds' : '✗ divergence';
-
-  // Stat tiles
-  const greens = runs.filter(r => r.parity).length;
-  // "Scenario class" is the part of a scenario name before the dot, same split used for
-  // the Latest run table below: a stable, data-derived count instead of a hardcoded one.
-  const scenarioClasses = new Set(Object.keys(latest.scenarios).map(name => name.split('.')[0]));
-  const tiles = [
-    { k: 'Recorded runs', v: String(runs.length), d: `${greens} green · ${runs.length - greens} red` },
-    { k: 'Scenarios', v: String(Object.keys(latest.scenarios).length), d: `${scenarioClasses.size} scenario classes` },
-    { k: 'Vanilla suite', v: latest.totals.vanilla.duration.toFixed(0), vu: 's', d: `${latest.totals.vanilla.passed}/${latest.totals.vanilla.total} passed` },
-    { k: 'Stratum suite', v: latest.totals.stratum.duration.toFixed(0), vu: 's', d: `${latest.totals.stratum.passed}/${latest.totals.stratum.total} passed` },
-    { k: 'Pinned Stratum', v: shortTag(latest.stratum_tag), d: latest.date.slice(0, 10) + ' @ ' + latest.sha.slice(0, 7) },
-  ];
-  if (scouts.length) {
-    const scout = scouts[scouts.length - 1];
-    tiles.push({
-      k: 'Indev scout', v: shortTag(scout.stratum_tag), small: true,
-      d: scout.date.slice(0, 10) + (scout.parity ? ' · ✓ parity' : ' · ✗ divergence'),
-    });
-  }
-  for (const t of tiles) {
-    const div = document.createElement('div');
-    div.className = 'tile';
-    div.innerHTML = `<div class="k">${t.k}</div><div class="v${t.small ? ' sm' : ''}">${esc(t.v)}${t.vu ? `<small>${t.vu}</small>` : ''}</div><div class="d">${esc(t.d)}</div>`;
-    tilesEl.appendChild(div);
+  if (latest) {
+    const badge = document.getElementById('verdict-badge');
+    badge.className = 'badge ' + (holds(latest) ? 'good' : 'critical');
+    badge.textContent = (holds(latest) ? '✓ ' : '✗ ') + verdictText(latest);
   }
 
-  if (scoutResult.error) {
-    document.getElementById('builds-table').closest('.card')
-      .insertAdjacentHTML('afterbegin', `<p class="error">Could not load data/scout.json (${esc(scoutResult.error)})</p>`);
+  renderLanes();
+  renderCorpus();
+  renderBuilds();
+  if (latest) {
+    renderVerdicts();
+    renderCharts();
+    renderLatest();
+  } else {
+    // Sections that read the pinned history and nothing else.
+    for (const section of document.querySelectorAll('[data-needs="pinned"]')) section.hidden = true;
   }
 
-  // Builds table: one row per Stratum build ever tested, across both lanes, newest first.
-  const collectBuilds = (list, channel) => {
+  // ---- Today: one card per lane ------------------------------------------------------
+
+  function metaRows(run) {
+    const totals = run.totals;
+    const rows = [
+      ['Last run', `${esc(fmtDateTime(run.date))} <span class="soft">(${esc(ago(run.date))})</span>`],
+      ['Scenarios', `vanilla ${esc(totals.vanilla.passed)}/${esc(totals.vanilla.total)} · ` +
+                    `stratum ${esc(totals.stratum.passed)}/${esc(totals.stratum.total)}`],
+      ['Suite time', `vanilla ${esc(totals.vanilla.duration.toFixed(0))} s · ` +
+                     `stratum ${esc(totals.stratum.duration.toFixed(0))} s`],
+    ];
+    if (run.stratum_sha) rows.push(['Stratum commit', stratumCommitLink(run.stratum_sha)]);
+    const tested = [
+      run.atlas_version && `Atlas ${esc(run.atlas_version)}`,
+      run.vs_version && `Vintage Story ${esc(run.vs_version)}`,
+    ].filter(Boolean);
+    if (tested.length) rows.push(['Tested with', tested.join(' · ')]);
+    rows.push(['Parity commit', parityCommitLink(run.sha)]);
+    rows.push(['CI run', ciLink(run.run_id, 'open in Actions')]);
+    return rows;
+  }
+
+  function laneCard(channel, run, noteHtml) {
+    const card = document.createElement('div');
+    card.className = 'lane';
+    if (!run) {
+      card.innerHTML = `<div class="lane-head"><span class="chan ${channel}">${channel}</span></div>${noteHtml}`;
+      return card;
+    }
+    const meta = metaRows(run)
+      .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${value}</dd>`).join('');
+    card.innerHTML =
+      `<div class="lane-head"><span class="chan ${channel}">${channel}</span>${verdictHtml(run)}</div>` +
+      `<div class="lane-tag">${esc(run.stratum_tag || '?')}</div>` +
+      `<dl class="meta">${meta}</dl>` +
+      causesHtml(run);
+    return card;
+  }
+
+  // What a lane card says when it has no run: a load failure reads as an error, an empty
+  // history reads as the ordinary state it is.
+  function laneNote(result, file, emptyText) {
+    return result.error
+      ? `<p class="error">${esc(`Could not load ${file} (${result.error}).`)}</p>`
+      : `<p class="foot">${esc(emptyText)}</p>`;
+  }
+
+  function renderLanes() {
+    todayEl.appendChild(laneCard('pinned', latest, laneNote(runsResult, 'data/runs.json',
+      'No pinned run recorded yet; the first CI run on main will publish one.')));
+    todayEl.appendChild(laneCard('indev', scouts[scouts.length - 1] || null,
+      laneNote(scoutResult, 'data/scout.json',
+        'No indev scout run recorded yet; the daily scout publishes the first one.')));
+  }
+
+  function renderCorpus() {
+    const count = (list, lane) => {
+      const green = list.filter(holds).length;
+      return `${list.length} ${lane} run(s): ${green} green, ${list.length - green} red`;
+    };
+    const parts = [];
+    if (runs.length) parts.push(count(runs, 'pinned'));
+    if (scouts.length) parts.push(count(scouts, 'indev'));
+    if (latest) {
+      // "Scenario class" is the part of a scenario name before the first dot, the same
+      // split the Latest run table uses: data-derived, never a hardcoded count.
+      const classes = new Set(Object.keys(latest.scenarios || {}).map(name => splitName(name)[0]));
+      parts.push(`${scenarioCount(latest)} scenarios in ${classes.size} classes`);
+    }
+    document.getElementById('corpus').textContent = parts.length ? parts.join('; ') + '.' : '';
+  }
+
+  // ---- Builds ------------------------------------------------------------------------
+
+  // One row per Stratum build ever tested, across both lanes, newest first.
+  function collectBuilds(list, channel) {
     const byTag = new Map();
     for (const run of list) {
       const tag = run.stratum_tag || '?';
@@ -357,39 +580,100 @@
       byTag.get(tag).push(run);
     }
     return [...byTag.entries()].map(([tag, tagRuns]) => ({ tag, channel, runs: tagRuns }));
-  };
-  const builds = [...collectBuilds(runs, 'pinned'), ...collectBuilds(scouts, 'indev')]
-    .map(b => ({ ...b, last: b.runs[b.runs.length - 1], reds: b.runs.filter(r => !r.parity).length }))
-    .sort((a, b) => Date.parse(b.last.date) - Date.parse(a.last.date));
-  const buildsBody = document.querySelector('#builds-table tbody');
-  for (const b of builds) {
-    const t = b.last.totals;
-    const tr = document.createElement('tr');
-    tr.innerHTML =
-      `<td class="scen"><span class="mth" title="${esc(b.tag)}">${esc(shortTag(b.tag))}</span></td>` +
-      `<td><span class="chan ${b.channel}">${b.channel}</span></td>` +
-      `<td>${b.last.parity ? '<span class="ok">✓ parity</span>' : '<span class="ko">✗ divergence</span>'}</td>` +
-      `<td class="num">${b.runs.length}${b.reds ? ` <span class="ko">(${b.reds} red)</span>` : ''}</td>` +
-      `<td class="num">${t.vanilla.passed}/${t.vanilla.total} · ${t.stratum.passed}/${t.stratum.total}</td>` +
-      `<td>${b.last.date.slice(0, 10)}</td>` +
-      `<td><a href="https://github.com/StratumServer/StratumParity/actions/runs/${b.last.run_id}">run</a></td>`;
-    buildsBody.appendChild(tr);
   }
 
-  // Verdict strip
-  const strip = document.getElementById('verdicts');
-  for (const run of runs) {
-    const a = document.createElement('a');
-    a.href = `https://github.com/StratumServer/StratumParity/actions/runs/${run.run_id}`;
-    a.style.background = run.parity ? css('--status-good') : css('--status-critical');
-    a.textContent = run.parity ? '✓' : '✗';
-    a.title = `${run.date.slice(0, 10)} @ ${run.sha}: ${run.parity ? 'parity holds' : 'divergence'}`;
-    strip.appendChild(a);
+  function renderBuilds() {
+    const builds = [...collectBuilds(runs, 'pinned'), ...collectBuilds(scouts, 'indev')]
+      .map(b => ({ ...b, last: b.runs[b.runs.length - 1], reds: b.runs.filter(r => !holds(r)).length }))
+      .sort((a, b) => Date.parse(b.last.date) - Date.parse(a.last.date));
+    const table = document.getElementById('builds-table');
+    if (!builds.length) {
+      table.replaceWith(Object.assign(document.createElement('p'), {
+        className: 'foot', textContent: 'No Stratum build tested yet on either lane.',
+      }));
+      return;
+    }
+    const body = table.querySelector('tbody');
+    for (const build of builds) {
+      const last = build.last;
+      const totals = last.totals;
+      // The Stratum commit belongs to the build, so it rides under the tag rather than
+      // widening the table with a column of its own.
+      const commit = last.stratum_sha ? `<span class="cls">${stratumCommitLink(last.stratum_sha)}</span>` : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td><span class="mth">${esc(build.tag)}</span>${commit}</td>` +
+        `<td><span class="chan ${build.channel}">${build.channel}</span></td>` +
+        `<td>${verdictHtml(last)}</td>` +
+        `<td class="num">${esc(build.runs.length)}${build.reds ? ` <span class="ko">(${esc(build.reds)} red)</span>` : ''}</td>` +
+        `<td class="num">${esc(totals.vanilla.passed)}/${esc(totals.vanilla.total)} · ${esc(totals.stratum.passed)}/${esc(totals.stratum.total)}</td>` +
+        `<td>${esc(fmtDate(last.date))}</td>` +
+        `<td>${ciLink(last.run_id, 'run')}</td>`;
+      body.appendChild(tr);
+      // A red row states its cause on the line below, so a divergence never needs a click
+      // to name itself. Only the first diverging scenario here: the lane card lists more.
+      const bad = divergences(last);
+      if (bad.length) {
+        const [name, entry] = bad[0];
+        const rest = bad.length > 1 ? ` (+${bad.length - 1} more)` : '';
+        appendCauseRow(body, tr, 7,
+          `<span class="cls">${esc(name)}${rest}</span>${causeSpan(entry)}`);
+      }
+    }
+  }
+
+  // The second line under a red table row, carrying why it is red.
+  function appendCauseRow(body, tr, columns, html) {
+    const row = document.createElement('tr');
+    row.className = 'cause-row';
+    row.innerHTML = `<td colspan="${columns}">${html}</td>`;
+    tr.classList.add('has-cause');
+    body.appendChild(row);
+  }
+
+  // ---- Run verdicts ------------------------------------------------------------------
+
+  function renderVerdicts() {
+    const strip = document.getElementById('verdicts');
+    for (const run of runs) {
+      const a = document.createElement('a');
+      a.href = `${PARITY_REPO}/actions/runs/${encodeURIComponent(run.run_id)}`;
+      a.style.background = holds(run) ? css('--status-good-bg') : css('--status-critical-bg');
+      a.textContent = holds(run) ? '✓' : '✗';
+      const label = `${fmtDate(run.date)} @ ${String(run.sha).slice(0, 7)}: ${verdictText(run)}`;
+      a.title = label;
+      a.setAttribute('aria-label', label);
+      strip.appendChild(a);
+    }
+  }
+
+  // ---- Charts ------------------------------------------------------------------------
+
+  const tooltip = document.getElementById('tooltip');
+  const live = document.getElementById('chart-live');
+
+  // Last / min / max per series, the textual equivalent of the line chart for anyone who
+  // cannot see it (and a useful headline for everyone else).
+  function summarize(seriesV, seriesS, unit) {
+    const part = (series, label) => {
+      const values = series.filter(v => v != null);
+      if (!values.length) return `${label}: no data`;
+      const last = [...series].reverse().find(v => v != null);
+      return `${label} last ${last.toFixed(1)}${unit}, min ${Math.min(...values).toFixed(1)}, ` +
+             `max ${Math.max(...values).toFixed(1)}`;
+    };
+    // Runs actually plotted, not runs recorded: the tick-cost pack only emits metrics on
+    // part of the history, and last/min/max already read from the plotted points alone.
+    const plotted = runs.filter((_, i) => seriesV[i] != null || seriesS[i] != null).length;
+    const covered = plotted === runs.length
+      ? `${plotted} run(s)` : `${plotted} of ${runs.length} runs`;
+    return `${covered} · ${part(seriesV, 'vanilla')} · ${part(seriesS, 'stratum')}.`;
   }
 
   // Line chart: two series over run index, crosshair + tooltip, direct end labels.
-  const tooltip = document.getElementById('tooltip');
-  function drawChart(svg, seriesV, seriesS, unit) {
+  // Reachable with the keyboard: focus the chart, then arrows / Home / End walk the runs
+  // and the crosshair, the tooltip and the live region follow.
+  function drawChart(svg, seriesV, seriesS, unit, summaryEl) {
     svg.innerHTML = '';
     const W = 960, H = 270, m = { l: 46, r: 76, t: 14, b: 30 };
     const n = runs.length;
@@ -412,7 +696,7 @@
     const ticks = n <= 6 ? runs.map((_, i) => i) : [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor(3 * n / 4), n - 1];
     for (const i of [...new Set(ticks)]) {
       const t = el('text', { x: xs(i), y: H - 10, 'text-anchor': 'middle', 'font-size': 11, fill: css('--text-muted') });
-      t.textContent = runs[i].date.slice(5, 10);
+      t.textContent = fmtDayMonth(runs[i].date);
     }
     const draw = (series, color, label, dy) => {
       const pts = series.map((v, i) => v == null ? null : [xs(i), ys(v)]);
@@ -431,60 +715,108 @@
     const dotV = el('circle', { r: 4, fill: css('--series-1'), stroke: css('--card'), 'stroke-width': 2, visibility: 'hidden' });
     const dotS = el('circle', { r: 4, fill: css('--series-2'), stroke: css('--card'), 'stroke-width': 2, visibility: 'hidden' });
     const overlay = el('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent' });
+
+    if (summaryEl) summaryEl.textContent = summarize(seriesV, seriesS, unit);
+
+    const fmt = v => v == null ? 'n/a' : v.toFixed(1) + unit;
+    const head = i => `${fmtDate(runs[i].date)} · ${String(runs[i].sha).slice(0, 7)} · ${shortTag(runs[i].stratum_tag)}`;
+    let active = -1;
+
+    function mark(i) {
+      active = i;
+      cross.setAttribute('x1', xs(i));
+      cross.setAttribute('x2', xs(i));
+      cross.setAttribute('visibility', 'visible');
+      const place = (dot, v) => {
+        if (v == null) { dot.setAttribute('visibility', 'hidden'); return; }
+        dot.setAttribute('cx', xs(i)); dot.setAttribute('cy', ys(v));
+        dot.setAttribute('visibility', 'visible');
+      };
+      place(dotV, seriesV[i]); place(dotS, seriesS[i]);
+      tooltip.innerHTML = `<b>${esc(head(i))}</b>` +
+        `<div class="row"><span class="sw" style="background:${css('--series-1')}"></span>vanilla ${esc(fmt(seriesV[i]))}</div>` +
+        `<div class="row"><span class="sw" style="background:${css('--series-2')}"></span>stratum ${esc(fmt(seriesS[i]))}</div>`;
+      tooltip.style.display = 'block';
+    }
+
+    // Clamped on both axes: a keyboard reader can reach a chart the browser has not
+    // finished scrolling into view, and an unclamped tooltip would land off-screen.
+    function placeTooltip(clientX, clientY) {
+      const fit = (v, size, limit) => Math.max(8, Math.min(v + 14, limit - size - 8));
+      tooltip.style.left = fit(clientX, tooltip.offsetWidth, window.innerWidth) + 'px';
+      tooltip.style.top = fit(clientY, tooltip.offsetHeight, window.innerHeight) + 'px';
+    }
+
+    function hide() {
+      active = -1;
+      for (const e of [cross, dotV, dotS]) e.setAttribute('visibility', 'hidden');
+      tooltip.style.display = 'none';
+    }
+
+    // Keyboard: park the tooltip next to the crosshair instead of the pointer, and repeat
+    // the reading into the live region so a screen reader announces each step.
+    function moveTo(i) {
+      const index = Math.max(0, Math.min(n - 1, i));
+      mark(index);
+      const rect = svg.getBoundingClientRect();
+      const y = seriesV[index] != null ? ys(seriesV[index]) : (H - m.b) / 2;
+      placeTooltip(rect.left + xs(index) * rect.width / W, rect.top + y * rect.height / H);
+      live.textContent = `${head(index)}: vanilla ${fmt(seriesV[index])}, stratum ${fmt(seriesS[index])}.`;
+    }
+
     overlay.addEventListener('mousemove', ev => {
       const rect = svg.getBoundingClientRect();
       const px = (ev.clientX - rect.left) * (W / rect.width);
       let best = 0, bd = Infinity;
       for (let i = 0; i < n; i++) { const d = Math.abs(xs(i) - px); if (d < bd) { bd = d; best = i; } }
-      cross.setAttribute('x1', xs(best)); cross.setAttribute('x2', xs(best));
-      cross.setAttribute('visibility', 'visible');
-      const place = (dot, v) => {
-        if (v == null) { dot.setAttribute('visibility', 'hidden'); return; }
-        dot.setAttribute('cx', xs(best)); dot.setAttribute('cy', ys(v));
-        dot.setAttribute('visibility', 'visible');
-      };
-      place(dotV, seriesV[best]); place(dotS, seriesS[best]);
-      const fmt = v => v == null ? 'n/a' : v.toFixed(1) + unit;
-      tooltip.innerHTML = `<b>${runs[best].date.slice(0, 10)}</b> · ${runs[best].sha.slice(0, 7)} · ${shortTag(runs[best].stratum_tag)}` +
-        `<div class="row"><span class="sw" style="background:${css('--series-1')}"></span>vanilla ${fmt(seriesV[best])}</div>` +
-        `<div class="row"><span class="sw" style="background:${css('--series-2')}"></span>stratum ${fmt(seriesS[best])}</div>`;
-      tooltip.style.display = 'block';
-      tooltip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 190) + 'px';
-      tooltip.style.top = (ev.clientY + 14) + 'px';
+      mark(best);
+      placeTooltip(ev.clientX, ev.clientY);
     });
-    overlay.addEventListener('mouseleave', () => {
-      cross.setAttribute('visibility', 'hidden');
-      dotV.setAttribute('visibility', 'hidden');
-      dotS.setAttribute('visibility', 'hidden');
-      tooltip.style.display = 'none';
-    });
+    overlay.addEventListener('mouseleave', hide);
+
+    // Property assignment, not addEventListener: the same <svg> element is redrawn every
+    // time the scenario select changes, and listeners added on it would pile up.
+    svg.onkeydown = ev => {
+      const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[ev.key];
+      if (step) { moveTo((active < 0 ? n - 1 : active) + step); }
+      else if (ev.key === 'Home') { moveTo(0); }
+      else if (ev.key === 'End') { moveTo(n - 1); }
+      else if (ev.key === 'Escape') { hide(); }
+      else { return; }
+      ev.preventDefault();
+    };
+    svg.onfocus = () => { if (active < 0) moveTo(n - 1); };
+    svg.onblur = hide;
   }
 
-  drawChart(document.getElementById('chart-total'),
-    runs.map(r => r.totals.vanilla.duration), runs.map(r => r.totals.stratum.duration), 's');
+  function renderCharts() {
+    drawChart(document.getElementById('chart-total'),
+      runs.map(r => r.totals.vanilla.duration), runs.map(r => r.totals.stratum.duration), 's',
+      document.getElementById('summary-total'));
 
-  const names = [...new Set(runs.flatMap(r => Object.keys(r.scenarios)))].sort();
-  const select = document.getElementById('scenario-select');
-  for (const name of names) {
-    const o = document.createElement('option'); o.value = name;
-    o.textContent = name.replace('.', ' · ');
-    select.appendChild(o);
-  }
-  const drawScenario = () => {
-    const name = select.value;
-    drawChart(document.getElementById('chart-scenario'),
-      runs.map(r => r.scenarios[name] && r.scenarios[name].v ? r.scenarios[name].v[1] : null),
-      runs.map(r => r.scenarios[name] && r.scenarios[name].s ? r.scenarios[name].s[1] : null), 's');
-  };
-  select.addEventListener('change', drawScenario);
-  drawScenario();
+    const names = [...new Set(runs.flatMap(r => Object.keys(r.scenarios)))].sort();
+    const select = document.getElementById('scenario-select');
+    for (const name of names) {
+      const o = document.createElement('option'); o.value = name;
+      o.textContent = name.replace('.', ' · ');
+      select.appendChild(o);
+    }
+    const drawScenario = () => {
+      const name = select.value;
+      drawChart(document.getElementById('chart-scenario'),
+        runs.map(r => r.scenarios[name] && r.scenarios[name].v ? r.scenarios[name].v[1] : null),
+        runs.map(r => r.scenarios[name] && r.scenarios[name].s ? r.scenarios[name].s[1] : null), 's',
+        document.getElementById('summary-scenario'));
+    };
+    select.addEventListener('change', drawScenario);
+    drawScenario();
 
-  // Tick cost (optional; only scenarios that carry perf metrics, schema 2+). Guarded with
-  // optional chaining so the pre-metrics runs read as null and drawChart renders gaps.
-  const perfMetric = (run, name, flavor) => run.scenarios?.[name]?.metrics?.[flavor]?.ms_per_tick ?? null;
-  const perfNames = [...new Set(runs.flatMap(r =>
-    Object.entries(r.scenarios).filter(([, e]) => e.metrics).map(([n]) => n)))].sort();
-  if (perfNames.length) {
+    // Tick cost (optional; only scenarios that carry perf metrics, schema 2+). Guarded with
+    // optional chaining so the pre-metrics runs read as null and drawChart renders gaps.
+    const perfMetric = (run, name, flavor) => run.scenarios?.[name]?.metrics?.[flavor]?.ms_per_tick ?? null;
+    const perfNames = [...new Set(runs.flatMap(r =>
+      Object.entries(r.scenarios).filter(([, e]) => e.metrics).map(([n]) => n)))].sort();
+    if (!perfNames.length) return;
     document.getElementById('perf-section').hidden = false;
     const perfSelect = document.getElementById('perf-select');
     for (const name of perfNames) {
@@ -495,26 +827,41 @@
     const drawPerf = () => {
       const name = perfSelect.value;
       drawChart(document.getElementById('chart-perf'),
-        runs.map(r => perfMetric(r, name, 'v')), runs.map(r => perfMetric(r, name, 's')), 'ms');
+        runs.map(r => perfMetric(r, name, 'v')), runs.map(r => perfMetric(r, name, 's')), 'ms',
+        document.getElementById('summary-perf'));
     };
     perfSelect.addEventListener('change', drawPerf);
     drawPerf();
   }
 
-  // Latest run table
-  document.getElementById('latest-caption').textContent =
-    `Run of ${latest.date.slice(0, 10)} at ${latest.sha.slice(0, 7)} on ${latest.stratum_tag || '?'}.`;
-  const tbody = document.querySelector('#latest-table tbody');
-  for (const [name, e] of Object.entries(latest.scenarios)) {
-    const v = e.v, s = e.s;
-    const [cls, mth] = name.split('.');
-    const cell = o => o ? (o[0] === 'Passed' ? '<span class="ok">✓ passed</span>' : '<span class="ko">✗ ' + o[0].toLowerCase() + '</span>') : '➖';
-    const delta = v && s ? (s[1] - v[1]).toFixed(1) : '';
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="scen"><span class="cls">${cls}</span><span class="mth">${mth}</span></td>` +
-      `<td>${cell(v)}</td><td class="num">${v ? v[1].toFixed(1) : ''}</td>` +
-      `<td>${cell(s)}</td><td class="num">${s ? s[1].toFixed(1) : ''}</td><td class="num">${delta}</td>`;
-    tbody.appendChild(tr);
+  // ---- Latest run --------------------------------------------------------------------
+
+  function renderLatest() {
+    const total = scenarioCount(latest);
+    const bad = divergences(latest).length;
+    const outcome = !total ? 'no scenario produced a result.'
+      : bad ? `${bad} of ${total} scenario(s) diverge.`
+      : `all ${total} scenario(s) agree.`;
+    document.getElementById('latest-caption').textContent =
+      `Run of ${fmtDate(latest.date)} at ${String(latest.sha).slice(0, 7)} ` +
+      `on ${latest.stratum_tag || '?'}: ${outcome}`;
+    const body = document.querySelector('#latest-table tbody');
+    for (const [name, entry] of Object.entries(latest.scenarios)) {
+      const v = entry.v, s = entry.s;
+      const [cls, mth] = splitName(name);
+      const cell = o => o
+        ? (o[0] === 'Passed'
+          ? '<span class="ok">✓ passed</span>'
+          : `<span class="ko">✗ ${esc(String(o[0]).toLowerCase())}</span>`)
+        : '➖';
+      const delta = v && s ? (s[1] - v[1]).toFixed(1) : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><span class="cls">${esc(cls)}</span><span class="mth">${esc(mth)}</span></td>` +
+        `<td>${cell(v)}</td><td class="num">${v ? esc(v[1].toFixed(1)) : ''}</td>` +
+        `<td>${cell(s)}</td><td class="num">${s ? esc(s[1].toFixed(1)) : ''}</td><td class="num">${esc(delta)}</td>`;
+      body.appendChild(tr);
+      if (diverges(entry)) appendCauseRow(body, tr, 6, causeSpan(entry));
+    }
   }
 })();
 </script>
