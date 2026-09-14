@@ -6,7 +6,8 @@ Usage:
   python3 history_append.py vanilla.trx stratum.trx \
       --history gh-pages/data/runs.json \
       --run-id 123 --sha abcdef --date 2026-07-14T10:00:00Z \
-      --stratum-tag v1.22.3-stratum.15 [--event push]
+      --stratum-tag v1.22.3-stratum.15 [--event push] \
+      [--atlas-version 0.13.1] [--vs-version 1.22.7]
 
 Re-appending a run id REPLACES the previous entry for that id: GitHub re-run attempts
 share the run id, and the re-run's results (say, green after a flaky red) must win.
@@ -25,17 +26,35 @@ from pathlib import Path
 # Perf pack scenarios emit `ATLAS_METRIC <key>=<number>` lines to their test stdout.
 METRIC_RE = re.compile(r'ATLAS_METRIC\s+(\w+)=([-\d.]+)')
 
+# A failure message can run to a full stack dump. The history keeps enough of it to tell
+# two red runs apart at a glance; the whole thing stays in the run's TRX artifact.
+ERROR_MAX = 400
+
 # NOSONAR below: this is the XML namespace identifier mandated by the TRX schema,
 # a fixed string compared against the document, never a URL that gets fetched.
 TRX_NS = {'trx': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}  # NOSONAR
 
 
+def short_error(message):
+    """A TRX failure message flattened onto one capped line.
+
+    Lines are joined in order, so the first one leads and the cap cuts the tail: an
+    xunit assertion header, or the sentence an Atlas setup exception opens with, is
+    what survives, not a truncated stack frame.
+    """
+    line = ' '.join(part.strip() for part in message.splitlines() if part.strip())
+    return line if len(line) <= ERROR_MAX else line[:ERROR_MAX - 1] + '…'
+
+
 def parse_trx(filepath):
-    """testName -> {'outcome', 'duration' (s), 'stdout'} from a TRX report.
+    """testName -> {'outcome', 'duration' (s), 'stdout', 'error'} from a TRX report.
 
     The history needs stdout from BOTH flavors (the perf metrics ride in it), which
     is why this stays a TRX parse instead of consuming `atlas diff --json-tests`:
     that document only carries the candidate side's stdout.
+
+    'error' is the failure message, read from the same Output/ErrorInfo/Message path
+    Atlas.Cli's TrxResultsReader uses, and empty for a test that carries none.
     """
     try:
         root = ET.parse(filepath).getroot()
@@ -51,15 +70,20 @@ def parse_trx(filepath):
         except ValueError:
             duration = 0.0
         stdout = ''
+        error = ''
         output = result.find('trx:Output', TRX_NS)
         if output is not None:
             stdout_elem = output.find('trx:StdOut', TRX_NS)
             if stdout_elem is not None and stdout_elem.text:
                 stdout = stdout_elem.text
+            message = output.find('trx:ErrorInfo/trx:Message', TRX_NS)
+            if message is not None and message.text:
+                error = short_error(message.text)
         results[result.get('testName', 'Unknown')] = {
             'outcome': result.get('outcome', 'Unknown'),
             'duration': duration,
             'stdout': stdout,
+            'error': error,
         }
     return results
 
@@ -93,6 +117,10 @@ def main():
     parser.add_argument('--date', required=True)
     parser.add_argument('--stratum-tag', default='')
     parser.add_argument('--event', default='')
+    parser.add_argument('--atlas-version', default='',
+                        help='version of the Atlas CLI that ran the suite')
+    parser.add_argument('--vs-version', default='',
+                        help='Vintage Story version both flavors were built on')
     parser.add_argument('--missing-ok', action='store_true',
                         help='treat a missing TRX file as an empty suite for that flavor')
     args = parser.parse_args()
@@ -108,9 +136,11 @@ def main():
     if history_path.exists():
         history = json.loads(history_path.read_text())
     else:
-        history = {'schema': 2, 'runs': []}
-    # Schema 2 adds the optional per-scenario 'metrics' key; older runs simply lack it.
-    history['schema'] = max(history.get('schema', 1), 2)
+        history = {'schema': 3, 'runs': []}
+    # Schema 2 added the optional per-scenario 'metrics' key, schema 3 the optional
+    # per-scenario 'error' and the run's optional provenance fields. Every one of them is
+    # optional on read: older runs simply lack them and are never rewritten to add them.
+    history['schema'] = max(history.get('schema', 1), 3)
 
     # A re-run attempt shares the run id; its results replace the earlier attempt's.
     before = len(history['runs'])
@@ -150,6 +180,15 @@ def main():
             if vt and st and vt > 0:
                 metrics['ratio'] = round(st / vt, 3)
             entry['metrics'] = metrics
+
+        # Why this scenario went red, per flavor, under an optional 'error' key: only a
+        # side that did not pass carries one, so a green run adds nothing to the file.
+        errors = {side: results[name]['error']
+                  for side, results in (('v', vanilla), ('s', stratum))
+                  if name in results and results[name]['outcome'] != 'Passed'
+                  and results[name]['error']}
+        if errors:
+            entry['error'] = errors
         scenarios[short] = entry
 
     parity = all(
@@ -157,19 +196,28 @@ def main():
         for e in scenarios.values()
     )
 
-    history['runs'].append({
+    run = {
         'run_id': args.run_id,
         'sha': args.sha[:12],
         'date': args.date,
         'stratum_tag': args.stratum_tag,
         'event': args.event,
+    }
+    # Provenance of what was tested, all optional: the workflows pass what they know and
+    # nothing is invented here, so an entry recorded before these existed simply lacks them.
+    for key, value in (('atlas_version', args.atlas_version),
+                       ('vs_version', args.vs_version)):
+        if value:
+            run[key] = value
+    run.update({
         'scenarios': scenarios,
         'totals': {'vanilla': totals(vanilla), 'stratum': totals(stratum)},
         'parity': parity,
     })
+    history['runs'].append(run)
     # Parse, don't string-compare: recorded dates mix UTC and +02:00 offsets, and a raw
     # string sort is not chronological across offsets.
-    history['runs'].sort(key=lambda run: datetime.fromisoformat(run['date']))
+    history['runs'].sort(key=lambda recorded: datetime.fromisoformat(recorded['date']))
 
     history_path.parent.mkdir(parents=True, exist_ok=True)
     # NOSONAR below: the path is resolved and confined to the working tree at the top

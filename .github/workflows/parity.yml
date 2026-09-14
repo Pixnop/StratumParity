@@ -12,6 +12,10 @@ on:
 env:
   VS_VERSION: '1.22.7'
   STRATUM_TAG: 'v1.22.7-stratum.2'
+  # Exact pin, so it is both what `dotnet tool install` fetches and what the history
+  # records as the Atlas that produced a run. The publish job needs the value on red
+  # runs too, where the compare job that installs the tool has already failed.
+  ATLAS_VERSION: '0.13.1'
 
 jobs:
   parity:
@@ -131,7 +135,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install Atlas CLI
-        run: dotnet tool install -g Pixnop.Atlas.Cli --version 0.13.1
+        run: dotnet tool install -g Pixnop.Atlas.Cli --version "${ATLAS_VERSION}"
 
       - uses: actions/download-artifact@v4
         with:
@@ -214,7 +218,9 @@ jobs:
                 --sha "${{ github.sha }}" \
                 --date "${run_date}" \
                 --stratum-tag "${STRATUM_TAG}" \
-                --event "${{ github.event_name }}"
+                --event "${{ github.event_name }}" \
+                --atlas-version "${ATLAS_VERSION}" \
+                --vs-version "${VS_VERSION}"
             else
               echo "::warning::no TRX at all (run died before testing); republishing the site without a new entry"
             fi
