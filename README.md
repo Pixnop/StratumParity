@@ -103,6 +103,6 @@ Atlas 0.11.
 
 ## Versions
 
-Pinned expectations: Vintage Story 1.22.3, Stratum v1.22.3-stratum.15, Atlas 0.11.0.
+Pinned expectations: Vintage Story 1.22.7, Stratum v1.22.7-stratum.2, Atlas 0.13.1.
 Stratum moves fast (releases every few days); when a scenario starts failing on a new
 Stratum release, that is the suite doing its job.
