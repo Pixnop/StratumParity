@@ -196,7 +196,20 @@ jobs:
         # onto the fresh branch and replays its append (idempotent per run id).
         # The checkout action leaves authenticated credentials in the gh-pages clone,
         # so the push needs no secret handling here.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # The Stratum commit behind the pinned tag, same lookup the scout lane's resolve
+          # job does: a lightweight tag's ref points straight at the commit, an annotated
+          # one at a tag object to dereference once. Best effort, a missing sha only costs
+          # the entry one field. `|| ref=''` matters, gh api writes the error body to stdout
+          # on a 404, so a failed lookup would otherwise read back as a sha-shaped bit of JSON.
+          ref=$(gh api "repos/StratumServer/Stratum/git/ref/tags/${STRATUM_TAG}" --jq '.object.type + " " + .object.sha') || ref=''
+          read -r kind stratum_sha <<<"${ref}" || true
+          if [ "$kind" = "tag" ]; then
+            stratum_sha=$(gh api "repos/StratumServer/Stratum/git/tags/${stratum_sha}" --jq '.object.sha') || stratum_sha=''
+          fi
+          [ -n "$stratum_sha" ] || echo "::warning::could not resolve the Stratum commit behind ${STRATUM_TAG}; the history entry will carry no stratum_sha"
           if [ "${{ github.event_name }}" = "schedule" ]; then
             run_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           else
@@ -218,6 +231,7 @@ jobs:
                 --sha "${{ github.sha }}" \
                 --date "${run_date}" \
                 --stratum-tag "${STRATUM_TAG}" \
+                --stratum-sha "${stratum_sha}" \
                 --event "${{ github.event_name }}" \
                 --atlas-version "${ATLAS_VERSION}" \
                 --vs-version "${VS_VERSION}"

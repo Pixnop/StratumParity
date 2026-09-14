@@ -26,9 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.pick.outputs.tag }}
+      sha: ${{ steps.pick.outputs.sha }}
     steps:
       - name: Pick the latest pre-release
         id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           tag=$(curl -fsSL "https://api.github.com/repos/StratumServer/Stratum/releases?per_page=10" \
             | python3 -c "import sys, json; print(next((r['tag_name'] for r in json.load(sys.stdin) if r['prerelease']), ''))")
@@ -38,8 +41,21 @@ jobs:
             echo "::error::no pre-release among the 10 most recent StratumServer/Stratum releases; nothing to scout"
             exit 1
           fi
-          echo "latest pre-release: $tag"
+          # The Stratum commit behind the tag, so an entry says which source was tested and
+          # not just which artifact. Stratum's pre-release tags are annotated, so the ref
+          # points at a tag object that has to be dereferenced once to reach the commit.
+          # Best effort: a sha we cannot resolve costs the entry one field, it must not sink
+          # a scout run. `|| ref=''` matters, gh api writes the error body to stdout on a
+          # 404, so a failed lookup would otherwise read back as a sha-shaped bit of JSON.
+          ref=$(gh api "repos/StratumServer/Stratum/git/ref/tags/${tag}" --jq '.object.type + " " + .object.sha') || ref=''
+          read -r kind sha <<<"${ref}" || true
+          if [ "$kind" = "tag" ]; then
+            sha=$(gh api "repos/StratumServer/Stratum/git/tags/${sha}" --jq '.object.sha') || sha=''
+          fi
+          [ -n "$sha" ] || echo "::warning::could not resolve the Stratum commit behind ${tag}; the history entry will carry no stratum_sha"
+          echo "latest pre-release: $tag ($sha)"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
   scout:
     needs: resolve
@@ -217,6 +233,7 @@ jobs:
         # so the push needs no secret handling here.
         env:
           SCOUT_TAG: ${{ needs.resolve.outputs.tag }}
+          SCOUT_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           if [ ! -f results/vanilla.trx ] && [ ! -f results/stratum-indev.trx ]; then
             echo "::warning::no TRX at all (run died before testing); nothing to record"
@@ -237,6 +254,7 @@ jobs:
               --sha "${{ github.sha }}" \
               --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
               --stratum-tag "${SCOUT_TAG}" \
+              --stratum-sha "${SCOUT_SHA}" \
               --event "${{ github.event_name }}" \
               --atlas-version "${ATLAS_VERSION}" \
               --vs-version "${VS_VERSION}"

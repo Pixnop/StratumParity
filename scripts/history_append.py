@@ -7,7 +7,10 @@ Usage:
       --history gh-pages/data/runs.json \
       --run-id 123 --sha abcdef --date 2026-07-14T10:00:00Z \
       --stratum-tag v1.22.3-stratum.15 [--event push] \
-      [--atlas-version 0.13.1] [--vs-version 1.22.7]
+      [--stratum-sha 0b39d09f77e6] [--atlas-version 0.13.1] [--vs-version 1.22.7]
+
+--sha is this repository's commit, --stratum-sha the Stratum commit the tested
+release was built from; they are two different repositories.
 
 Re-appending a run id REPLACES the previous entry for that id: GitHub re-run attempts
 share the run id, and the re-run's results (say, green after a flaky red) must win.
@@ -116,6 +119,10 @@ def main():
     parser.add_argument('--sha', required=True)
     parser.add_argument('--date', required=True)
     parser.add_argument('--stratum-tag', default='')
+    # Not to be confused with --sha, which is this repository's own commit: this one is the
+    # Stratum commit the tested release was built from.
+    parser.add_argument('--stratum-sha', default='',
+                        help='commit of StratumServer/Stratum behind --stratum-tag')
     parser.add_argument('--event', default='')
     parser.add_argument('--atlas-version', default='',
                         help='version of the Atlas CLI that ran the suite')
@@ -205,7 +212,8 @@ def main():
     }
     # Provenance of what was tested, all optional: the workflows pass what they know and
     # nothing is invented here, so an entry recorded before these existed simply lacks them.
-    for key, value in (('atlas_version', args.atlas_version),
+    for key, value in (('stratum_sha', args.stratum_sha[:12]),
+                       ('atlas_version', args.atlas_version),
                        ('vs_version', args.vs_version)):
         if value:
             run[key] = value
